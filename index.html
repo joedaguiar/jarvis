@@ -403,9 +403,23 @@ function carregarCalendarios() {
   return calsPromessa;
 }
 async function _carregarCalendarios() {
-  const j = await graph('GET', '/me/calendars?$top=100&$select=id,name,hexColor,canEdit,owner,isDefaultCalendar');
-  calendarios = j.value.map(c => ({ id: c.id, nome: c.name, cor: c.hexColor || '', podeEditar: c.canEdit, dono: (c.owner && (c.owner.name || c.owner.address)) || '', padrao: c.isDefaultCalendar }));
-  if (!D.config.calendariosVisiveis) { D.config.calendariosVisiveis = calendarios.map(c => c.id); salvar(); }
+  const sel = '$top=100&$select=id,name,hexColor,canEdit,owner,isDefaultCalendar';
+  const mapa = new Map();
+  const add = (lst, grupo) => lst.forEach(c => { if (!mapa.has(c.id)) mapa.set(c.id, { id: c.id, nome: c.name, cor: c.hexColor || '', podeEditar: c.canEdit, dono: (c.owner && (c.owner.name || c.owner.address)) || '', padrao: c.isDefaultCalendar, grupo }); });
+  add((await graph('GET', '/me/calendars?' + sel)).value, '');
+  try {
+    const gs = (await graph('GET', '/me/calendarGroups?$select=id,name')).value;
+    for (const g of gs) add((await graph('GET', `/me/calendarGroups/${encodeURIComponent(g.id)}/calendars?${sel}`)).value, g.name);
+  } catch (e) { console.warn('grupos de calendário', e); }
+  calendarios = [...mapa.values()];
+  // calendários novos entram visíveis
+  const conhecidos = new Set(D.config.calendariosConhecidos || D.config.calendariosVisiveis || []);
+  const vis = new Set(D.config.calendariosVisiveis || []);
+  let mudou = !D.config.calendariosVisiveis;
+  calendarios.forEach(c => { if (!conhecidos.has(c.id)) { vis.add(c.id); mudou = true; } });
+  D.config.calendariosVisiveis = [...vis];
+  D.config.calendariosConhecidos = calendarios.map(c => c.id);
+  if (mudou) salvar();
 }
 function tzOff() { const m = -new Date().getTimezoneOffset(), a = Math.abs(m); return (m >= 0 ? '+' : '-') + pad(Math.floor(a / 60)) + ':' + pad(a % 60); }
 const corCal = (c, i) => c.cor || CORES[(i + 4) % CORES.length];
@@ -751,7 +765,7 @@ function secoesItens(itens, ctx) {
 
 function vConfig() {
   const c = D.config;
-  const cals = conectado() ? (calendarios.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Pode editar</b></td></tr>${calendarios.map((k, i) => `<tr><td><span class="sw" style="background:${corCal(k, i)}"></span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc(k.dono)}</div></td>
+  const cals = conectado() ? (calendarios.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Pode editar</b></td></tr>${calendarios.map((k, i) => `<tr><td><span class="sw" style="background:${corCal(k, i)}"></span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
       <td><input type="checkbox" data-calvis="${esc(k.id)}" ${(c.calendariosVisiveis || []).includes(k.id) ? 'checked' : ''}></td><td>${k.podeEditar ? 'Sim' : 'Só leitura'}</td></tr>`).join('')}</table>` : '<div class="empty">Carregando calendários…</div>') : '<div class="empty">Conecte o Outlook para escolher os calendários.</div>';
   if (conectado() && !calendarios.length && !vConfig._tentou) vConfig._tentou = true, carregarCalendarios().then(render).catch(e => { erroOutlook = e.message; });
   const opcCal = sel => `<option value="">Calendário principal</option>` + calendarios.filter(k => k.podeEditar && !k.padrao).map(k => `<option value="${esc(k.id)}" ${sel === k.id ? 'selected' : ''}>${esc(k.nome)}</option>`).join('');
