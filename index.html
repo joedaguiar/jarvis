@@ -334,7 +334,7 @@ function descRec(r) {
 /* ================= Outlook (Microsoft Graph) ================= */
 const SCOPES = ['User.Read', 'Calendars.ReadWrite', 'Calendars.ReadWrite.Shared', 'Files.ReadWrite'];
 const REDIRECT = location.origin + location.pathname.replace(/index\.html$/, '');
-let msalApp = null, conta = null, calendarios = [], eventos = [], faixaEventos = '', erroOutlook = '';
+let msalApp = null, conta = null, calendarios = [], eventos = [], faixaEventos = '', erroOutlook = '', calsPromessa = null;
 async function iniciarMsal() {
   if (!window.msal) return;
   try {
@@ -365,20 +365,44 @@ async function token() {
     throw e;
   }
 }
+// fila: a Microsoft permite no máximo 4 consultas simultâneas por caixa de correio
+let ativos = 0; const fila = [];
+async function vez() { if (ativos < 2) { ativos++; return; } await new Promise(r => fila.push(r)); ativos++; }
+function libera() { ativos--; const n = fila.shift(); if (n) n(); }
+const espera = ms => new Promise(r => setTimeout(r, ms));
 async function graph(method, path, body) {
-  const t = await token();
   const url = path.startsWith('http') ? path : GRAPH + path;
-  const r = await fetch(url, {
-    method, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', Prefer: `outlook.timezone="${(D && D.config.fuso) || 'E. South America Standard Time'}"` },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  if (r.status === 204) return null;
-  const j = await r.json().catch(() => null);
-  if (!r.ok) throw new Error((j && j.error && j.error.message) || ('Erro ' + r.status));
-  return j;
+  for (let tentativa = 0; ; tentativa++) {
+    const t = await token();
+    await vez();
+    let r;
+    try {
+      r = await fetch(url, {
+        method, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', Prefer: `outlook.timezone="${(D && D.config.fuso) || 'E. South America Standard Time'}"` },
+        body: body ? JSON.stringify(body) : undefined
+      });
+    } finally { libera(); }
+    if ((r.status === 429 || r.status === 503 || r.status === 504) && tentativa < 5) {
+      const ra = +r.headers.get('Retry-After');
+      await espera((ra ? ra * 1000 : 800 * 2 ** tentativa) + Math.random() * 300);
+      continue;
+    }
+    if (r.status === 204) return null;
+    const j = await r.json().catch(() => null);
+    if (!r.ok) {
+      const msg = (j && j.error && j.error.message) || ('Erro ' + r.status);
+      if (/Concurrency/i.test(msg) && tentativa < 5) { await espera(800 * 2 ** tentativa); continue; }
+      throw new Error(msg);
+    }
+    return j;
+  }
 }
 const calPath = id => id ? `/me/calendars/${encodeURIComponent(id)}` : '/me/calendar';
-async function carregarCalendarios() {
+function carregarCalendarios() {
+  if (!calsPromessa) calsPromessa = _carregarCalendarios().catch(e => { calsPromessa = null; throw e; });
+  return calsPromessa;
+}
+async function _carregarCalendarios() {
   const j = await graph('GET', '/me/calendars?$top=100&$select=id,name,hexColor,canEdit,owner,isDefaultCalendar');
   calendarios = j.value.map(c => ({ id: c.id, nome: c.name, cor: c.hexColor || '', podeEditar: c.canEdit, dono: (c.owner && (c.owner.name || c.owner.address)) || '', padrao: c.isDefaultCalendar }));
   if (!D.config.calendariosVisiveis) { D.config.calendariosVisiveis = calendarios.map(c => c.id); salvar(); }
@@ -395,14 +419,14 @@ async function carregarEventos(ini, fim, forcar) {
     const vis = calendarios.filter(c => (D.config.calendariosVisiveis || []).includes(c.id));
     const off = tzOff(), sd = encodeURIComponent(ymd(ini) + 'T00:00:00' + off), ed = encodeURIComponent(ymd(addDays(fim, 1)) + 'T00:00:00' + off);
     const lista = [];
-    await Promise.all(vis.map(async c => {
+    for (const c of vis) {
       let url = `${calPath(c.id)}/calendarView?startDateTime=${sd}&endDateTime=${ed}&$top=250&$select=id,subject,start,end,isAllDay,location,organizer,webLink,onlineMeeting,seriesMasterId,isCancelled,showAs`;
       while (url) {
         const j = await graph('GET', url);
         j.value.forEach(e => { if (!e.isCancelled) lista.push(Object.assign(e, { _cal: c })); });
         url = j['@odata.nextLink'];
       }
-    }));
+    }
     eventos = lista; erroOutlook = '';
   } catch (e) { erroOutlook = e.message; console.error(e); }
   render();
@@ -962,7 +986,7 @@ document.addEventListener('click', async ev => {
     case 'calHoje': refCal = hoje0(); return render();
     case 'modoSemana': modoCal = 'semana'; return render();
     case 'modoMes': modoCal = 'mes'; return render();
-    case 'recarregar': faixaEventos = ''; calendarios = []; return render();
+    case 'recarregar': faixaEventos = ''; calendarios = []; calsPromessa = null; erroOutlook = ''; return render();
     case 'novaArea': return modalArea(null);
     case 'novoProj': return modalProj(null);
     case 'salvarArea': {
