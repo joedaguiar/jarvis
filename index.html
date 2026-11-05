@@ -171,6 +171,7 @@ table.cfg td{padding:6px 4px;border-bottom:1px solid #f0f1f4;vertical-align:midd
 <div id="toast"></div>
 
 <script src="msal-browser.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 "use strict";
 /* ================= utilidades ================= */
@@ -424,25 +425,32 @@ async function _carregarCalendarios() {
 function tzOff() { const m = -new Date().getTimezoneOffset(), a = Math.abs(m); return (m >= 0 ? '+' : '-') + pad(Math.floor(a / 60)) + ':' + pad(a % 60); }
 const corCal = (c, i) => c.cor || CORES[(i + 4) % CORES.length];
 async function carregarEventos(ini, fim, forcar) {
-  if (!conectado()) return;
-  const chave = ymd(ini) + '|' + ymd(fim) + '|' + (D.config.calendariosVisiveis || []).join(',');
+  if (!conectado() && !gOk()) return;
+  const chave = ymd(ini) + '|' + ymd(fim) + '|' + (D.config.calendariosVisiveis || []).join(',') + '|' + conectado() + gOk();
   if (!forcar && chave === faixaEventos) return;
   faixaEventos = chave;
-  try {
-    if (!calendarios.length) await carregarCalendarios();
-    const vis = calendarios.filter(c => (D.config.calendariosVisiveis || []).includes(c.id));
-    const off = tzOff(), sd = encodeURIComponent(ymd(ini) + 'T00:00:00' + off), ed = encodeURIComponent(ymd(addDays(fim, 1)) + 'T00:00:00' + off);
-    const lista = [];
-    for (const c of vis) {
-      let url = `${calPath(c.id)}/calendarView?startDateTime=${sd}&endDateTime=${ed}&$top=250&$select=id,subject,start,end,isAllDay,location,organizer,webLink,onlineMeeting,seriesMasterId,isCancelled,showAs`;
-      while (url) {
-        const j = await graph('GET', url);
-        j.value.forEach(e => { if (!e.isCancelled) lista.push(Object.assign(e, { _cal: c })); });
-        url = j['@odata.nextLink'];
+  const lista = [];
+  if (conectado()) {
+    try {
+      if (!calendarios.length) await carregarCalendarios();
+      const vis = calendarios.filter(c => (D.config.calendariosVisiveis || []).includes(c.id));
+      const off = tzOff(), sd = encodeURIComponent(ymd(ini) + 'T00:00:00' + off), ed = encodeURIComponent(ymd(addDays(fim, 1)) + 'T00:00:00' + off);
+      for (const c of vis) {
+        let url = `${calPath(c.id)}/calendarView?startDateTime=${sd}&endDateTime=${ed}&$top=250&$select=id,subject,start,end,isAllDay,location,organizer,webLink,onlineMeeting,seriesMasterId,isCancelled,showAs`;
+        while (url) {
+          const j = await graph('GET', url);
+          j.value.forEach(e => { if (!e.isCancelled) lista.push(Object.assign(e, { _cal: c })); });
+          url = j['@odata.nextLink'];
+        }
       }
-    }
-    eventos = lista; erroOutlook = '';
-  } catch (e) { erroOutlook = e.message; console.error(e); }
+      erroOutlook = '';
+    } catch (e) { erroOutlook = e.message; console.error(e); }
+  }
+  if (gOk()) {
+    try { await gEventos(ini, fim, lista); erroGoogle = ''; }
+    catch (e) { erroGoogle = e.message; console.error(e); }
+  }
+  eventos = lista;
   render();
 }
 function idsDoSistema() {
@@ -494,35 +502,153 @@ function payloadEvento(it) {
 function calendarioDoItem(it) {
   return it.calendarioId || (area(it.areaId) || {}).calendarioId || D.config.calendarioPadrao || '';
 }
+async function apagarEventoDoItem(o) {
+  if (ehG(o.calendarId)) await gapi('DELETE', gEv(o.calendarId, o.eventId)).catch(() => { });
+  else await graph('DELETE', `${calPath(o.calendarId)}/events/${o.eventId}`).catch(() => { });
+}
 async function sincronizar(it) {
-  if (!conectado()) { if (it.sincronizar) it.erroSync = 'Aguardando conexão com o Outlook'; return; }
+  const cal = calendarioDoItem(it), alvoG = ehG(cal);
+  const precisa = [it.sincronizar ? (alvoG ? 'g' : 'o') : '', it.outlook ? (ehG(it.outlook.calendarId) ? 'g' : 'o') : ''];
+  if (precisa.includes('o') && !conectado() || precisa.includes('g') && !gOk()) {
+    if (it.sincronizar) it.erroSync = 'Aguardando conexão com o ' + (precisa.includes('g') && !gOk() ? 'Google' : 'Outlook');
+    return;
+  }
   try {
-    const cal = calendarioDoItem(it);
-    if (!it.sincronizar) {
-      if (it.outlook) { await graph('DELETE', `${calPath(it.outlook.calendarId)}/events/${it.outlook.eventId}`).catch(() => { }); it.outlook = null; }
-      it.erroSync = ''; return;
-    }
-    if (it.outlook && it.outlook.calendarId !== cal) {
-      await graph('DELETE', `${calPath(it.outlook.calendarId)}/events/${it.outlook.eventId}`).catch(() => { });
-      it.outlook = null;
-    }
-    const body = payloadEvento(it);
-    if (it.outlook) {
-      await graph('PATCH', `${calPath(cal)}/events/${it.outlook.eventId}`, body);
+    if (!it.sincronizar) { if (it.outlook) { await apagarEventoDoItem(it.outlook); it.outlook = null; } it.erroSync = ''; return; }
+    if (it.outlook && it.outlook.calendarId !== cal) { await apagarEventoDoItem(it.outlook); it.outlook = null; }
+    if (alvoG) {
+      const body = payloadGoogle(it), conv = it.tipo === 'reuniao' ? '?sendUpdates=all' : '';
+      if (it.outlook) await gapi('PATCH', gEv(cal, it.outlook.eventId) + conv, body);
+      else { const r = await gapi('POST', `/calendars/${encodeURIComponent(cal.slice(2))}/events${conv}`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
     } else {
-      const r = await graph('POST', `${calPath(cal)}/events`, body);
-      it.outlook = { eventId: r.id, calendarId: cal };
+      const body = payloadEvento(it);
+      if (it.outlook) await graph('PATCH', `${calPath(cal)}/events/${it.outlook.eventId}`, body);
+      else { const r = await graph('POST', `${calPath(cal)}/events`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
     }
     it.erroSync = '';
   } catch (e) {
-    it.erroSync = e.message; toast('Outlook: ' + e.message, true);
+    it.erroSync = e.message; toast((alvoG ? 'Google: ' : 'Outlook: ') + e.message, true);
   }
 }
 async function sincronizarPendentes() {
-  const pend = D.itens.filter(it => it.sincronizar && (!it.outlook || it.erroSync));
+  const pend = D.itens.filter(it => it.sincronizar && (!it.outlook || it.erroSync) && (ehG(calendarioDoItem(it)) ? gOk() : conectado()));
   for (const it of pend) await sincronizar(it);
-  if (pend.length) { salvar(); toast(`${pend.length} item(ns) enviados ao Outlook.`); }
+  if (pend.length) { salvar(); toast(`${pend.length} item(ns) enviados à agenda.`); }
 }
+
+
+/* ================= Google Agenda ================= */
+const GOOGLE_CLIENT_ID = '';
+const GAPI = 'https://www.googleapis.com/calendar/v3';
+const GTZ = 'America/Sao_Paulo';
+let gToken = null, gExp = 0, calendariosG = [], erroGoogle = '', gPedindo = false;
+const ehG = id => !!id && id.startsWith('g:');
+function gCfg() { if (!D.config.google) D.config.google = { clientId: '', ativo: false, email: '', conhecidos: null }; return D.config.google; }
+const gClientId = () => gCfg().clientId || GOOGLE_CLIENT_ID;
+const gOk = () => !!gToken && Date.now() < gExp - 60000;
+function gRestaurar() { try { const j = JSON.parse(localStorage.getItem('gtoken')); if (j && j.exp > Date.now()) { gToken = j.t; gExp = j.exp; } } catch { } }
+function gConectar(primeira) {
+  return new Promise((res, rej) => {
+    if (!window.google || !google.accounts || !google.accounts.oauth2) return rej(new Error('O login do Google ainda está carregando. Tente de novo em alguns segundos.'));
+    if (!gClientId()) return rej(new Error('Informe o ID do cliente do Google em Configurações.'));
+    gPedindo = true;
+    const cli = google.accounts.oauth2.initTokenClient({
+      client_id: gClientId(), scope: 'https://www.googleapis.com/auth/calendar',
+      callback: r => {
+        gPedindo = false;
+        if (r.error) return rej(new Error(r.error_description || r.error));
+        gToken = r.access_token; gExp = Date.now() + (+r.expires_in || 3600) * 1000;
+        try { localStorage.setItem('gtoken', JSON.stringify({ t: gToken, exp: gExp })); } catch { }
+        gCfg().ativo = true; erroGoogle = ''; salvar(); res();
+      },
+      error_callback: e => { gPedindo = false; rej(new Error(e.type === 'popup_closed' ? 'Janela do Google fechada antes de concluir.' : (e.message || e.type))); }
+    });
+    cli.requestAccessToken({ prompt: primeira ? 'consent' : '', hint: gCfg().email || undefined });
+  });
+}
+async function gEntrar(primeira) {
+  try { await gConectar(primeira); calendariosG = []; faixaEventos = ''; await gCarregarCalendarios(); render(); sincronizarPendentes(); toast('Google Agenda conectado.'); }
+  catch (e) { erroGoogle = e.message; render(); toast('Google: ' + e.message, true); }
+}
+function gSair() {
+  try { if (gToken && window.google) google.accounts.oauth2.revoke(gToken, () => { }); } catch { }
+  gToken = null; gExp = 0; calendariosG = []; try { localStorage.removeItem('gtoken'); } catch { }
+  gCfg().ativo = false; faixaEventos = ''; salvar(); render();
+}
+// o token do Google dura 1 hora: renova no próximo clique do usuário (o navegador só permite a janela do Google após um clique)
+document.addEventListener('click', () => {
+  if (D && gCfg().ativo && !gPedindo && gClientId() && (!gToken || Date.now() > gExp - 5 * 60000))
+    gConectar(false).then(() => { faixaEventos = ''; render(); }).catch(e => console.warn('google', e));
+}, true);
+async function gapi(method, path, body) {
+  if (!gOk()) throw new Error('A conexão com o Google expirou. Clique em qualquer lugar para renovar.');
+  const r = await fetch(GAPI + path, { method, headers: { Authorization: 'Bearer ' + gToken, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 204) return null;
+  const j = await r.json().catch(() => null);
+  if (r.status === 401) { gToken = null; try { localStorage.removeItem('gtoken'); } catch { } throw new Error('A conexão com o Google expirou. Clique em qualquer lugar para renovar.'); }
+  if (!r.ok) throw new Error((j && j.error && j.error.message) || ('Google: erro ' + r.status));
+  return j;
+}
+async function gCarregarCalendarios() {
+  const j = await gapi('GET', '/users/me/calendarList?maxResults=250');
+  calendariosG = j.items.map(c => ({ id: 'g:' + c.id, gid: c.id, nome: c.summaryOverride || c.summary, cor: c.backgroundColor || '', podeEditar: ['owner', 'writer'].includes(c.accessRole), dono: 'Google', grupo: 'Google', padrao: false, fonte: 'google', _sel: c.selected }));
+  const prim = j.items.find(c => c.primary); if (prim) gCfg().email = prim.id;
+  const conhecidos = new Set(gCfg().conhecidos || []), vis = new Set(D.config.calendariosVisiveis || []);
+  calendariosG.forEach(c => { if (!conhecidos.has(c.id) && c._sel !== false) vis.add(c.id); });
+  D.config.calendariosVisiveis = [...vis]; gCfg().conhecidos = calendariosG.map(c => c.id); salvar();
+}
+function gNormalizar(ev, c) {
+  const dia = !!ev.start.date;
+  return {
+    id: 'g:' + ev.id, rawId: ev.id, seriesMasterId: ev.recurringEventId || null, subject: ev.summary || '(sem título)', isAllDay: dia,
+    start: { dateTime: dia ? ev.start.date + 'T00:00:00' : ev.start.dateTime.slice(0, 19) },
+    end: { dateTime: dia ? ev.end.date + 'T00:00:00' : ev.end.dateTime.slice(0, 19) },
+    location: { displayName: ev.location || '' }, webLink: ev.htmlLink,
+    organizer: ev.organizer ? { emailAddress: { name: ev.organizer.displayName || ev.organizer.email } } : null,
+    onlineMeeting: ev.hangoutLink ? { joinUrl: ev.hangoutLink } : null, _cal: c
+  };
+}
+async function gEventos(ini, fim, lista) {
+  if (!calendariosG.length) await gCarregarCalendarios();
+  const off = tzOff(), t0 = encodeURIComponent(ymd(ini) + 'T00:00:00' + off), t1 = encodeURIComponent(ymd(addDays(fim, 1)) + 'T00:00:00' + off);
+  for (const c of calendariosG.filter(c => (D.config.calendariosVisiveis || []).includes(c.id))) {
+    let pt = '';
+    do {
+      const j = await gapi('GET', `/calendars/${encodeURIComponent(c.gid)}/events?timeMin=${t0}&timeMax=${t1}&singleEvents=true&maxResults=2500&timeZone=${encodeURIComponent(GTZ)}${pt ? '&pageToken=' + encodeURIComponent(pt) : ''}`);
+      (j.items || []).forEach(ev => { if (ev.status !== 'cancelled' && ev.start) lista.push(gNormalizar(ev, c)); });
+      pt = j.nextPageToken;
+    } while (pt);
+  }
+}
+function gRrule(it) {
+  const r = it.recorrencia; if (!r) return null;
+  const DD = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'], iv = Math.max(1, +r.intervalo || 1);
+  let s;
+  if (r.freq === 'diaria') s = `FREQ=DAILY;INTERVAL=${iv}`;
+  else if (r.freq === 'semanal') s = `FREQ=WEEKLY;INTERVAL=${iv};BYDAY=${(r.dias && r.dias.length ? r.dias : [parseYmd(it.data).getDay()]).map(i => DD[i]).join(',')}`;
+  else if (r.modoMensal === 'posicao') s = `FREQ=MONTHLY;INTERVAL=${iv};BYDAY=${+r.posicao}${DD[+r.diaSemana]}`;
+  else s = `FREQ=MONTHLY;INTERVAL=${iv};BYMONTHDAY=${+r.diaMes || parseYmd(it.data).getDate()}`;
+  if (r.ate) s += ';UNTIL=' + r.ate.replace(/-/g, '') + (it.hora ? 'T235959Z' : '');
+  return 'RRULE:' + s;
+}
+function payloadGoogle(it) {
+  const ini = primeiraOcorrencia(it) || ymd(hoje0()), p = projeto(it.projetoId), a = area(it.areaId);
+  const ev = {
+    summary: it.titulo + (p ? ` — ${p.nome}` : ''),
+    description: (it.notas ? it.notas + '\n\n' : '') + `[Meus Afazeres] ${a ? a.nome : ''}${p ? ' / ' + p.nome : ''}`,
+    location: it.local || '',
+    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: Math.max(0, +it.lembrete || 0) }] }
+  };
+  if (it.hora) {
+    const st = hm2min(it.hora), en = st + (+it.duracao || 30), fimD = en >= 1440 ? ymd(addDays(parseYmd(ini), 1)) : ini;
+    ev.start = { dateTime: `${ini}T${it.hora}:00`, timeZone: GTZ }; ev.end = { dateTime: `${fimD}T${min2hm(en)}:00`, timeZone: GTZ };
+  } else { ev.start = { date: ini }; ev.end = { date: ymd(addDays(parseYmd(ini), 1)) }; }
+  const rr = gRrule(it); ev.recurrence = rr ? [rr] : [];
+  if (it.tipo === 'reuniao') ev.attendees = (it.participantes || '').split(/[,;\s]+/).filter(x => x.includes('@')).map(email => ({ email }));
+  return ev;
+}
+const gEv = (calId, evId) => `/calendars/${encodeURIComponent(calId.slice(2))}/events/${encodeURIComponent(evId)}`;
+const todosCals = () => [...calendarios, ...calendariosG];
 
 /* ================= entradas (itens + eventos) ================= */
 let filtroOff = new Set(); // ids de áreas desligadas; 'outlook' para eventos sem área
@@ -537,11 +663,11 @@ function entradas(ini, fim) {
   });
   const meus = idsDoSistema();
   eventos.forEach(e => {
-    if (meus.has(e.id) || (e.seriesMasterId && meus.has(e.seriesMasterId))) return;
+    if (meus.has(e.rawId || e.id) || (e.seriesMasterId && meus.has(e.seriesMasterId))) return;
     const ar = D.areas.find(a => a.calendarioId && a.calendarioId === e._cal.id);
     if (ar ? filtroOff.has(ar.id) : filtroOff.has('outlook')) return;
     const sd = e.start.dateTime.slice(0, 10), st = e.start.dateTime.slice(11, 16), en = e.end.dateTime.slice(11, 16);
-    const ci = calendarios.indexOf(e._cal);
+    const ci = todosCals().indexOf(e._cal);
     const base = { k: 'ev', e, titulo: e.subject || '(sem título)', cor: ar ? ar.cor : corCal(e._cal, ci), feito: false };
     if (e.isAllDay) {
       for (let d = parseYmd(sd); d < parseYmd(e.end.dateTime.slice(0, 10)); d = addDays(d, 1))
@@ -556,7 +682,7 @@ function entradas(ini, fim) {
 }
 function subtitulo(x) {
   if (x.k === 'ev') {
-    const own = x.e._cal.padrao ? 'Outlook' : x.e._cal.nome;
+    const own = x.e._cal.fonte === 'google' ? 'Google · ' + x.e._cal.nome : (x.e._cal.padrao ? 'Outlook' : x.e._cal.nome);
     return esc(own) + (x.e.location && x.e.location.displayName ? ' · ' + esc(x.e.location.displayName) : '');
   }
   const it = x.it, a = area(it.areaId), p = projeto(it.projetoId);
@@ -596,12 +722,13 @@ function render() {
 function renderFiltros() {
   const show = ['hoje', 'semana', 'calendario'].includes(vista);
   $('#filtros').innerHTML = !show ? '' : D.areas.map(a => `<button class="chip ${filtroOff.has(a.id) ? 'off' : ''}" data-filtro="${a.id}"><span class="sw" style="background:${a.cor}"></span>${esc(a.nome)}</button>`).join('') +
-    (conectado() ? `<button class="chip ${filtroOff.has('outlook') ? 'off' : ''}" data-filtro="outlook"><span class="sw" style="background:#94a3b8"></span>Outlook</button>` : '');
+    (conectado() || gOk() ? `<button class="chip ${filtroOff.has('outlook') ? 'off' : ''}" data-filtro="outlook"><span class="sw" style="background:#94a3b8"></span>Outras agendas</button>` : '');
 }
 function renderStatus() {
   const el = $('#outlookStatus');
   if (conectado()) el.innerHTML = `<span class="dot" style="background:#22c55e"></span>Outlook conectado<br><span style="opacity:.7">${esc(conta.username)}</span>` + (erroOutlook ? `<br><span style="color:#fca5a5">${esc(erroOutlook)}</span>` : '');
   else el.innerHTML = `<span class="dot" style="background:#f59e0b"></span>Outlook desconectado<br><button class="btn sm" style="margin-top:6px" data-acao="entrar">Conectar Outlook</button>`;
+  if (gCfg().ativo) el.innerHTML += `<div style="margin-top:8px"><span class="dot" style="background:${gOk() ? '#22c55e' : '#f59e0b'}"></span>Google ${gOk() ? 'conectado' : '— clique para renovar'}<br><span style="opacity:.7">${esc(gCfg().email)}</span>${erroGoogle ? `<br><span style="color:#fca5a5">${esc(erroGoogle)}</span>` : ''}</div>`;
 }
 
 function vHoje() {
@@ -658,7 +785,7 @@ function vCalendario() {
   const head = `<div class="cal-head"><button class="btn" data-acao="calAnt">‹</button><button class="btn" data-acao="calHoje">Hoje</button><button class="btn" data-acao="calProx">›</button>
     <span class="lbl" id="calLbl"></span><span style="flex:1"></span>
     <button class="btn ${modoCal === 'semana' ? 'pri' : ''}" data-acao="modoSemana">Semana</button><button class="btn ${modoCal === 'mes' ? 'pri' : ''}" data-acao="modoMes">Mês</button>
-    ${conectado() ? `<button class="btn" data-acao="recarregar" title="Buscar de novo no Outlook">⟳</button>` : ''}</div>`;
+    ${conectado() || gOk() ? `<button class="btn" data-acao="recarregar" title="Buscar as agendas de novo">⟳</button>` : ''}</div>`;
   const hs = ymd(hoje0());
   if (modoCal === 'mes') {
     const m0 = new Date(refCal.getFullYear(), refCal.getMonth(), 1), ini = segunda(m0), fim = addDays(ini, 41);
@@ -765,10 +892,12 @@ function secoesItens(itens, ctx) {
 
 function vConfig() {
   const c = D.config;
-  const cals = conectado() ? (calendarios.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Pode editar</b></td></tr>${calendarios.map((k, i) => `<tr><td><span class="sw" style="background:${corCal(k, i)}"></span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
-      <td><input type="checkbox" data-calvis="${esc(k.id)}" ${(c.calendariosVisiveis || []).includes(k.id) ? 'checked' : ''}></td><td>${k.podeEditar ? 'Sim' : 'Só leitura'}</td></tr>`).join('')}</table>` : '<div class="empty">Carregando calendários…</div>') : '<div class="empty">Conecte o Outlook para escolher os calendários.</div>';
+  const listaCals = todosCals();
+  const cals = (conectado() || gOk()) ? (listaCals.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Pode editar</b></td></tr>${listaCals.map((k, i) => `<tr><td><span class="sw" style="background:${corCal(k, i)}"></span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
+      <td><input type="checkbox" data-calvis="${esc(k.id)}" ${(c.calendariosVisiveis || []).includes(k.id) ? 'checked' : ''}></td><td>${k.podeEditar ? 'Sim' : 'Só leitura'}</td></tr>`).join('')}</table>` : '<div class="empty">Carregando calendários…</div>') : '<div class="empty">Conecte o Outlook ou o Google para escolher os calendários.</div>';
   if (conectado() && !calendarios.length && !vConfig._tentou) vConfig._tentou = true, carregarCalendarios().then(render).catch(e => { erroOutlook = e.message; });
-  const opcCal = sel => `<option value="">Calendário principal</option>` + calendarios.filter(k => k.podeEditar && !k.padrao).map(k => `<option value="${esc(k.id)}" ${sel === k.id ? 'selected' : ''}>${esc(k.nome)}</option>`).join('');
+  if (gOk() && !calendariosG.length && !vConfig._tentouG) vConfig._tentouG = true, gCarregarCalendarios().then(render).catch(e => { erroGoogle = e.message; });
+  const opcCal = sel => `<option value="">Calendário principal do Outlook</option>` + listaCals.filter(k => k.podeEditar && !k.padrao).map(k => `<option value="${esc(k.id)}" ${sel === k.id ? 'selected' : ''}>${k.fonte === 'google' ? 'Google · ' : ''}${esc(k.nome)}</option>`).join('');
   return `<div class="grid2"><div>
     <div class="card"><h3>Conexão com o Outlook</h3>
       ${conectado() ? `<p>Conectado como <b>${esc(conta.username)}</b>.</p><button class="btn" data-acao="sincPend">Enviar pendentes ao Outlook</button> <button class="btn dan" data-acao="sair">Desconectar</button>`
@@ -776,10 +905,17 @@ function vConfig() {
       ${erroOutlook ? `<p class="tag err" style="display:block;padding:8px;margin-top:10px">${esc(erroOutlook)}</p>` : ''}
       <p class="hint" style="margin-top:10px">Aplicativo: ${APP.clientId}<br>Endereço de retorno: ${esc(REDIRECT)}</p>
     </div>
-    <div class="card"><h3>Onde gravar no Outlook</h3>
+    <div class="card"><h3>Google Agenda</h3>
+      ${gCfg().ativo ? `<p>${gOk() ? 'Conectado' : 'Conexão expirada (renova no próximo clique)'}${gCfg().email ? ' como <b>' + esc(gCfg().email) + '</b>' : ''}.</p><button class="btn" data-acao="gEntrar">Reconectar</button> <button class="btn dan" data-acao="gSair">Desconectar</button>`
+      : `<p>Conecte sua conta do Gmail para ver e editar as agendas do Google (Treinos, Refeições, JF…).</p><button class="btn pri" data-acao="gEntrar" ${gClientId() ? '' : 'disabled'}>Conectar Google</button>`}
+      ${erroGoogle ? `<p class="tag err" style="display:block;padding:8px;margin-top:10px">${esc(erroGoogle)}</p>` : ''}
+      <div class="f" style="margin-top:12px"><label>ID do cliente do Google (termina em .apps.googleusercontent.com)</label><input id="gCid" value="${esc(gClientId())}"></div>
+      <button class="btn sm" data-acao="gSalvarId">Salvar ID</button>
+      <p class="hint">O Google exige renovar a conexão a cada hora; o sistema renova sozinho no seu próximo clique (uma janelinha pode piscar).</p></div>
+    <div class="card"><h3>Onde gravar nas agendas</h3>
       <div class="f"><label>Calendário padrão para novos itens</label><select id="cfgCalPad">${opcCal(c.calendarioPadrao)}</select></div>
-      ${D.areas.map(a => `<div class="f"><label>${esc(a.nome)}: calendário vinculado</label><select data-areacal="${a.id}">${opcCal(a.calendarioId)}${calendarios.filter(k => !k.podeEditar).map(k => `<option value="${esc(k.id)}" ${a.calendarioId === k.id ? 'selected' : ''}>${esc(k.nome)} (só leitura)</option>`).join('')}</select></div>`).join('')}
-      <p class="hint">Se uma empresa tiver um calendário vinculado, os eventos desse calendário ganham a cor da empresa, e os itens dela são gravados lá (quando você tem permissão de edição).</p>
+      ${D.areas.map(a => `<div class="f"><label>${esc(a.nome)}: calendário vinculado</label><select data-areacal="${a.id}">${opcCal(a.calendarioId)}${listaCals.filter(k => !k.podeEditar).map(k => `<option value="${esc(k.id)}" ${a.calendarioId === k.id ? 'selected' : ''}>${esc(k.nome)} (só leitura)</option>`).join('')}</select></div>`).join('')}
+      <p class="hint">Se uma empresa tiver um calendário vinculado (do Outlook ou do Google), os eventos desse calendário ganham a cor da empresa, e os itens dela são gravados lá (quando você tem permissão de edição).</p>
     </div></div><div>
     <div class="card"><h3>Calendários exibidos</h3>${cals}</div>
     <div class="card"><h3>Lembretes</h3>
@@ -800,7 +936,7 @@ function modalItem(it, novo) {
   const repetir = it.recorrencia ? r.freq : 'nao';
   const optsArea = D.areas.map(a => `<option value="${a.id}" ${a.id === it.areaId ? 'selected' : ''}>${esc(a.nome)}</option>`).join('');
   const optsProj = aid => `<option value="">— sem projeto —</option>` + D.projetos.filter(p => p.areaId === aid).map(p => `<option value="${p.id}" ${p.id === it.projetoId ? 'selected' : ''}>${esc(p.nome)}</option>`).join('');
-  const optsCal = `<option value="">Automático (${esc(nomeCal(calendarioDoItem(Object.assign({}, it, { calendarioId: '' }))))})</option>` + calendarios.filter(k => k.podeEditar).map(k => `<option value="${esc(k.id)}" ${it.calendarioId === k.id ? 'selected' : ''}>${esc(k.nome)}</option>`).join('');
+  const optsCal = `<option value="">Automático (${esc(nomeCal(calendarioDoItem(Object.assign({}, it, { calendarioId: '' }))))})</option>` + todosCals().filter(k => k.podeEditar).map(k => `<option value="${esc(k.id)}" ${it.calendarioId === k.id ? 'selected' : ''}>${k.fonte === 'google' ? 'Google · ' : ''}${esc(k.nome)}</option>`).join('');
   const dsel = r.dias || [];
   abrirModal(`<h3>${novo ? 'Novo item' : 'Editar item'}</h3>
   <div class="fr"><div class="f" style="flex:2"><label>Título</label><input id="iTit" value="${esc(it.titulo)}" placeholder="Ex.: Relatório semanal de avanço"></div>
@@ -823,7 +959,7 @@ function modalItem(it, novo) {
   <div class="reu"><div class="f"><label>Participantes (e-mails separados por vírgula)</label><input id="iPart" value="${esc(it.participantes)}"></div>
     <div class="fr"><div class="f"><label>Local</label><input id="iLocal" value="${esc(it.local)}"></div></div>
     <label class="cb"><input type="checkbox" id="iTeams" ${it.teams ? 'checked' : ''}> Criar como reunião do Teams</label></div>
-  <div class="box"><label class="cb" style="margin:0"><input type="checkbox" id="iSync" ${it.sincronizar ? 'checked' : ''}> <b>Gravar na agenda do Outlook</b></label>
+  <div class="box"><label class="cb" style="margin:0"><input type="checkbox" id="iSync" ${it.sincronizar ? 'checked' : ''}> <b>Gravar na agenda (Outlook ou Google)</b></label>
     <div class="fr sync" style="margin-top:10px"><div class="f"><label>Calendário</label><select id="iCal">${optsCal}</select></div><div class="f"><label>Lembrete (min antes)</label><input type="number" id="iLemb" min="0" value="${it.lembrete}"></div></div>
     ${!conectado() ? '<div class="hint sync">O Outlook não está conectado. O item será enviado quando você conectar.</div>' : ''}
     ${it.erroSync ? `<div class="tag err" style="display:block;padding:6px;margin-top:6px">${esc(it.erroSync)}</div>` : ''}</div>
@@ -852,7 +988,7 @@ function modalItem(it, novo) {
   $('#iArea').addEventListener('change', () => { $('#iProj').innerHTML = optsProj($('#iArea').value); });
   upd();
 }
-function nomeCal(id) { if (!id) return 'principal'; const k = calendarios.find(c => c.id === id); return k ? k.nome : 'outro'; }
+function nomeCal(id) { if (!id) return 'Outlook principal'; const k = todosCals().find(c => c.id === id); return k ? (k.fonte === 'google' ? 'Google · ' : '') + k.nome : 'outro'; }
 async function salvarItemModal() {
   const id = modalItem._id, novo = modalItem._novo;
   const it = novo ? modalItem._rascunho : D.itens.find(i => i.id === id);
@@ -897,35 +1033,42 @@ function modalEvento(e) {
   const sd = e.start.dateTime.slice(0, 10), st = e.start.dateTime.slice(11, 16), en = e.end.dateTime.slice(11, 16);
   const join = e.onlineMeeting && e.onlineMeeting.joinUrl;
   abrirModal(`<h3>${esc(e.subject || '(sem título)')}</h3>
-    <p class="hint">Evento do Outlook · calendário <b>${esc(c.nome)}</b>${e.organizer ? ' · organizador: ' + esc(e.organizer.emailAddress.name) : ''}${e.seriesMasterId ? ' · faz parte de uma série' : ''}</p>
+    <p class="hint">Evento ${c.fonte === 'google' ? 'do Google' : 'do Outlook'} · calendário <b>${esc(c.nome)}</b>${e.organizer ? ' · organizador: ' + esc(e.organizer.emailAddress.name) : ''}${e.seriesMasterId ? ' · faz parte de uma série' : ''}</p>
     ${edit ? `<div class="f"><label>Título</label><input id="eTit" value="${esc(e.subject)}"></div>
     <div class="fr"><div class="f"><label>Data</label><input type="date" id="eData" value="${sd}"></div>${e.isAllDay ? '' : `<div class="f"><label>Início</label><input type="time" id="eIni" value="${st}"></div><div class="f"><label>Fim</label><input type="time" id="eFim" value="${en}"></div>`}</div>
     <div class="f"><label>Local</label><input id="eLocal" value="${esc(e.location && e.location.displayName)}"></div>
     ${e.seriesMasterId ? '<p class="hint">As alterações valem só para esta ocorrência.</p>' : ''}`
       : `<p>${fmtData(sd)} ${e.isAllDay ? '(dia todo)' : st + '–' + en}</p>${e.location && e.location.displayName ? `<p>Local: ${esc(e.location.displayName)}</p>` : ''}<p class="hint">Este calendário é só para leitura.</p>`}
-    <p>${join ? `<a href="${esc(join)}" target="_blank">Entrar na reunião do Teams</a> · ` : ''}${e.webLink ? `<a href="${esc(e.webLink)}" target="_blank">Abrir no Outlook</a>` : ''}</p>
+    <p>${join ? `<a href="${esc(join)}" target="_blank">Entrar na reunião online</a> · ` : ''}${e.webLink ? `<a href="${esc(e.webLink)}" target="_blank">Abrir no ${c.fonte === 'google' ? 'Google Agenda' : 'Outlook'}</a>` : ''}</p>
     <div class="acts">${edit ? `<button class="btn dan l" data-acao="excluirEv">Excluir</button>` : ''}<button class="btn" data-acao="fechar">Fechar</button>${edit ? `<button class="btn pri" data-acao="salvarEv">Salvar</button>` : ''}</div>`);
   modalEvento._e = e;
 }
 async function salvarEvento() {
-  const e = modalEvento._e, d = $('#eData').value;
-  const body = { subject: $('#eTit').value, location: { displayName: $('#eLocal').value } };
-  if (!e.isAllDay) {
-    body.start = { dateTime: `${d}T${$('#eIni').value}:00`, timeZone: D.config.fuso };
-    body.end = { dateTime: `${d}T${$('#eFim').value}:00`, timeZone: D.config.fuso };
-  } else {
-    body.start = { dateTime: `${d}T00:00:00`, timeZone: D.config.fuso };
-    body.end = { dateTime: `${ymd(addDays(parseYmd(d), 1))}T00:00:00`, timeZone: D.config.fuso };
-  }
-  try { await graph('PATCH', `${calPath(e._cal.id)}/events/${e.id}`, body); toast('Evento atualizado no Outlook.'); fecharModal(); faixaEventos = ''; render(); }
-  catch (er) { toast('Outlook: ' + er.message, true); }
+  const e = modalEvento._e, d = $('#eData').value, g = e._cal.fonte === 'google';
+  const ini = e.isAllDay ? null : $('#eIni').value, fimH = e.isAllDay ? null : $('#eFim').value, d2 = ymd(addDays(parseYmd(d), 1));
+  try {
+    if (g) {
+      const body = { summary: $('#eTit').value, location: $('#eLocal').value };
+      if (e.isAllDay) { body.start = { date: d }; body.end = { date: d2 }; }
+      else { body.start = { dateTime: `${d}T${ini}:00`, timeZone: GTZ }; body.end = { dateTime: `${d}T${fimH}:00`, timeZone: GTZ }; }
+      await gapi('PATCH', gEv(e._cal.id, e.rawId), body);
+    } else {
+      const body = { subject: $('#eTit').value, location: { displayName: $('#eLocal').value } };
+      if (!e.isAllDay) { body.start = { dateTime: `${d}T${ini}:00`, timeZone: D.config.fuso }; body.end = { dateTime: `${d}T${fimH}:00`, timeZone: D.config.fuso }; }
+      else { body.start = { dateTime: `${d}T00:00:00`, timeZone: D.config.fuso }; body.end = { dateTime: `${d2}T00:00:00`, timeZone: D.config.fuso }; }
+      await graph('PATCH', `${calPath(e._cal.id)}/events/${e.id}`, body);
+    }
+    toast('Evento atualizado.'); fecharModal(); faixaEventos = ''; render();
+  } catch (er) { toast((g ? 'Google: ' : 'Outlook: ') + er.message, true); }
 }
 async function excluirEvento() {
-  const e = modalEvento._e;
-  if (!confirmar.ok) { confirmar.ok = true; $('[data-acao=excluirEv]').textContent = 'Confirmar exclusão no Outlook'; return; }
+  const e = modalEvento._e, g = e._cal.fonte === 'google';
+  if (!confirmar.ok) { confirmar.ok = true; $('[data-acao=excluirEv]').textContent = 'Confirmar exclusão'; return; }
   confirmar.ok = false;
-  try { await graph('DELETE', `${calPath(e._cal.id)}/events/${e.id}`); toast('Evento excluído.'); fecharModal(); faixaEventos = ''; render(); }
-  catch (er) { toast('Outlook: ' + er.message, true); }
+  try {
+    if (g) await gapi('DELETE', gEv(e._cal.id, e.rawId)); else await graph('DELETE', `${calPath(e._cal.id)}/events/${e.id}`);
+    toast('Evento excluído.'); fecharModal(); faixaEventos = ''; render();
+  } catch (er) { toast((g ? 'Google: ' : 'Outlook: ') + er.message, true); }
 }
 
 function modalArea(a) {
@@ -1000,7 +1143,10 @@ document.addEventListener('click', async ev => {
     case 'calHoje': refCal = hoje0(); return render();
     case 'modoSemana': modoCal = 'semana'; return render();
     case 'modoMes': modoCal = 'mes'; return render();
-    case 'recarregar': faixaEventos = ''; calendarios = []; calsPromessa = null; erroOutlook = ''; return render();
+    case 'recarregar': faixaEventos = ''; calendarios = []; calendariosG = []; calsPromessa = null; erroOutlook = ''; erroGoogle = ''; return render();
+    case 'gEntrar': return gEntrar(!gCfg().ativo);
+    case 'gSair': return gSair();
+    case 'gSalvarId': gCfg().clientId = $('#gCid').value.trim(); salvar(); toast('ID do Google salvo.'); return render();
     case 'novaArea': return modalArea(null);
     case 'novoProj': return modalProj(null);
     case 'salvarArea': {
@@ -1087,7 +1233,9 @@ function telaLogin(msg) {
   try { await carregar(); }
   catch (e) { return telaLogin('Não consegui ler seus dados no OneDrive: ' + e.message); }
   document.body.classList.remove('login');
+  gRestaurar();
   render();
+  if (gOk()) gCarregarCalendarios().then(() => { faixaEventos = ''; render(); }).catch(e => { erroGoogle = e.message; });
   carregarCalendarios().then(() => { sincronizarPendentes(); render(); }).catch(e => { erroOutlook = e.message; render(); });
   pedirNotif();
   setInterval(verificarLembretes, 30000); verificarLembretes();
