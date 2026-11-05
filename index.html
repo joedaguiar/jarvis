@@ -429,6 +429,7 @@ async function carregarEventos(ini, fim, forcar) {
   const chave = ymd(ini) + '|' + ymd(fim) + '|' + (D.config.calendariosVisiveis || []).join(',') + '|' + conectado() + gOk();
   if (!forcar && chave === faixaEventos) return;
   faixaEventos = chave;
+  const minha = ++carregarEventos.seq;
   const lista = [];
   if (conectado()) {
     try {
@@ -450,9 +451,11 @@ async function carregarEventos(ini, fim, forcar) {
     try { await gEventos(ini, fim, lista); erroGoogle = ''; }
     catch (e) { erroGoogle = e.message; console.error(e); }
   }
+  if (minha !== carregarEventos.seq) return; // chegou uma busca mais nova; descarta esta
   eventos = lista;
   render();
 }
+carregarEventos.seq = 0;
 function idsDoSistema() {
   const s = new Set();
   D.itens.forEach(it => { if (it.outlook && it.outlook.eventId) s.add(it.outlook.eventId); });
@@ -780,7 +783,7 @@ function vSemana() {
   return html + '</div>';
 }
 
-const H0 = 6, H1 = 23, PX = 48;
+const H0 = 5, H1 = 24, PX = 48;
 function vCalendario() {
   const head = `<div class="cal-head"><button class="btn" data-acao="calAnt">‹</button><button class="btn" data-acao="calHoje">Hoje</button><button class="btn" data-acao="calProx">›</button>
     <span class="lbl" id="calLbl"></span><span style="flex:1"></span>
