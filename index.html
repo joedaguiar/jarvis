@@ -667,6 +667,12 @@ async function gDiagnostico() {
       } while (pt);
       if (!n) linhas.push([c.nome, vis, '(nenhum evento nesta semana)'].join('\t'));
     }
+    // regras de repetição das séries (como estão gravadas no Google)
+    linhas.push('', 'SÉRIES (regra gravada no Google)', 'agenda\ttítulo\tinício da série\tregra');
+    for (const c of calendariosG.filter(c => (D.config.calendariosVisiveis || []).includes(c.id))) {
+      const j = await gapi('GET', `/calendars/${encodeURIComponent(c.gid)}/events?singleEvents=false&maxResults=2500&timeMin=${t0}&timeMax=${t1}`);
+      (j.items || []).filter(ev => ev.recurrence).forEach(ev => linhas.push([c.nome, ev.summary || '', (ev.start && (ev.start.dateTime || ev.start.date)) || '', ev.recurrence.join(' | ')].join('\t')));
+    }
   } catch (e) { linhas.push('ERRO: ' + e.message); }
   const mostrados = eventos.filter(e => e._cal.fonte === 'google').length;
   abrirModal(`<h3>Diagnóstico das agendas do Google</h3><p class="hint">Semana de ${fmtData(ymd(ini))} a ${fmtData(ymd(fim))}. ${linhas.length - 1} linha(s) vindas do Google; ${mostrados} evento(s) do Google carregados na tela atual. Copie o texto abaixo e envie ao Claude.</p>
