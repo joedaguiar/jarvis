@@ -548,7 +548,7 @@ function payloadEvento(it) {
     categories: a ? [a.nome] : [],
     isReminderOn: +it.lembrete >= 0,
     reminderMinutesBeforeStart: Math.max(0, +it.lembrete || 0),
-    showAs: 'busy',
+    showAs: it.showAs || 'busy',
     location: { displayName: it.local || '' }
   };
   if (it.hora) {
@@ -566,6 +566,7 @@ function payloadEvento(it) {
   ev.recurrence = rec;
   if (it.vinculado) {
     const min = { subject: it.titulo, start: ev.start, end: ev.end, isAllDay: ev.isAllDay };
+    if ((it.showAs || 'busy') !== (it.showAsImport || 'busy')) min.showAs = it.showAs || 'busy';
     if (JSON.stringify(it.recorrencia) !== it.recImport) min.recurrence = rec;
     return min;
   }
@@ -604,7 +605,7 @@ async function sincronizar(it) {
       else { const r = await graph('POST', `${calPath(cal)}/events`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
     }
     it.erroSync = ''; delete it._pend;
-    if (it.vinculado) it.recImport = JSON.stringify(it.recorrencia);
+    if (it.vinculado) { it.recImport = JSON.stringify(it.recorrencia); it.showAsImport = it.showAs || 'busy'; }
   } catch (e) {
     it.erroSync = e.message; toast((alvoG ? 'Google: ' : 'Outlook: ') + e.message, true);
   }
@@ -717,7 +718,8 @@ function payloadGoogle(it) {
     summary: it.titulo + (p ? ` — ${p.nome}` : ''),
     description: (it.notas ? it.notas + '\n\n' : '') + `[Meus Afazeres] ${a ? a.nome : ''}${p ? ' / ' + p.nome : ''}`,
     location: it.local || '',
-    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: Math.max(0, +it.lembrete || 0) }] }
+    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: Math.max(0, +it.lembrete || 0) }] },
+    transparency: it.showAs === 'free' ? 'transparent' : 'opaque'
   };
   if (it.hora) {
     const st = hm2min(it.hora), en = st + (+it.duracao || 30), fimD = en >= 1440 ? ymd(addDays(parseYmd(ini), 1)) : ini;
@@ -726,6 +728,7 @@ function payloadGoogle(it) {
   const rr = gRrule(it); ev.recurrence = rr ? [rr] : [];
   if (it.vinculado) {
     const min = { summary: it.titulo, start: ev.start, end: ev.end };
+    if ((it.showAs || 'busy') !== (it.showAsImport || 'busy')) min.transparency = ev.transparency;
     if (JSON.stringify(it.recorrencia) !== it.recImport) min.recurrence = ev.recurrence;
     return min;
   }
@@ -781,7 +784,7 @@ function entradas(ini, fim) {
       const data = (x && x.data) || d, hora = x && x.hora !== undefined ? x.hora : it.hora, dur = (x && x.duracao) || it.duracao;
       const dd = parseYmd(data); if (dd < ini || dd > fim) return;
       const st = hora ? hm2min(hora) : null;
-      out.push({ k: 'item', it, orig: d, data, hora, dur, fim: st != null ? min2hm(Math.min(st + (+dur || 30), 1439)) : '', titulo: it.titulo, cor: corItem(it), feito: !!it.concluidas[d] });
+      out.push({ k: 'item', it, sa: it.showAs, orig: d, data, hora, dur, fim: st != null ? min2hm(Math.min(st + (+dur || 30), 1439)) : '', titulo: it.titulo, cor: corItem(it), feito: !!it.concluidas[d] });
     });
   });
   const meus = idsDoSistema();
@@ -796,6 +799,7 @@ function entradas(ini, fim) {
     if (dono) {
       if (!dono.recorrencia && !e.isAllDay && !dono.erroSync && (dono.data !== sd || dono.hora !== st)) { dono.data = sd; dono.hora = st; dono.duracao = Math.max(15, hm2min(en) - hm2min(st)); salvar(); }
       if (dono.excecoes && dono.excecoes[sd] && dono.excecoes[sd].cancelada) return;
+      if (e.showAs && !dono._pend && dono.showAs !== e.showAs && !e.seriesMasterId) { dono.showAs = e.showAs; if (dono.vinculado) dono.showAsImport = e.showAs; }
       base = { k: 'item', it: dono, orig: sd, titulo: dono.vinculado ? (e.subject || dono.titulo) : dono.titulo, cor: corEvento(e, corBase), sa: e.showAs, feito: !!dono.concluidas[sd], ev: e };
     } else base = { k: 'ev', e, titulo: e.subject || '(sem título)', cor: corEvento(e, corBase), sa: e.showAs, feito: false };
     if (e.isAllDay) {
@@ -1103,7 +1107,8 @@ function modalItem(it, novo) {
   <div class="reu"><div class="f"><label>Participantes (e-mails separados por vírgula)</label><input id="iPart" value="${esc(it.participantes)}"></div>
     <div class="fr"><div class="f"><label>Local</label><input id="iLocal" value="${esc(it.local)}"></div></div>
     <label class="cb"><input type="checkbox" id="iTeams" ${it.teams ? 'checked' : ''}> Criar como reunião do Teams</label></div>
-  <div class="fr"><div class="f"><label>Lembrete (min antes)</label><input type="number" id="iLemb" min="0" value="${it.lembrete}"></div><div class="f" style="flex:2;justify-content:flex-end">
+  <div class="fr"><div class="f"><label>Mostrar como</label><select id="iSA">${['busy', 'tentative', 'free', 'oof', 'workingElsewhere'].map(k => `<option value="${k}" ${(it.showAs || 'busy') === k ? 'selected' : ''}>${SHOWAS[k]}</option>`).join('')}</select></div>
+    <div class="f"><label>Lembrete (min antes)</label><input type="number" id="iLemb" min="0" value="${it.lembrete}"></div><div class="f" style="flex:2;justify-content:flex-end">
     ${it.vinculado ? `<div class="hint">Vinculado a um evento que já existia na agenda.</div>` : '<div class="hint">Com data, o item é gravado como evento na agenda escolhida.</div>'}
     ${it.erroSync ? `<div class="tag err" style="display:block;padding:6px;margin-top:6px">${esc(it.erroSync)}</div>` : ''}</div></div>
   <div class="f"><label>Notas</label><textarea id="iNotas">${esc(it.notas)}</textarea></div>
@@ -1165,7 +1170,7 @@ async function salvarItemModal() {
     titulo: tit, tipo: $('#iTipo').value, projetoId: $('#iProj').value,
     data: $('#iData').value, hora: $('#iHora').value, duracao: Math.max(5, +$('#iDur').value || 60), recorrencia: rec,
     participantes: $('#iPart').value.trim(), local: $('#iLocal').value.trim(), teams: $('#iTeams').checked,
-    calendarioId: $('#iCal').value, lembrete: Math.max(0, +$('#iLemb').value || 0), notas: $('#iNotas').value
+    calendarioId: $('#iCal').value, showAs: $('#iSA').value, lembrete: Math.max(0, +$('#iLemb').value || 0), notas: $('#iNotas').value
   });
   it.sincronizar = !!it.data && !it.leitura;
   if (it.sincronizar) it._pend = true;
@@ -1418,7 +1423,7 @@ async function vincularEvento() {
       titulo: base.titulo, tipo: base.rec ? 'rotina' : 'tarefa', projetoId: p.id, areaId: p.areaId,
       data: base.ini.slice(0, 10), hora: base.dia ? '' : base.ini.slice(11, 16), duracao: base.dia ? 60 : dur, recorrencia: base.rec,
       calendarioId: c.padrao ? '@principal' : c.id, outlook: { eventId: base.id, calendarId: c.padrao ? '' : c.id },
-      sincronizar: c.podeEditar, leitura: !c.podeEditar, vinculado: true, recImport: JSON.stringify(base.rec)
+      sincronizar: c.podeEditar, leitura: !c.podeEditar, vinculado: true, recImport: JSON.stringify(base.rec), showAs: e.showAs || 'busy', showAsImport: e.showAs || 'busy'
     });
     D.itens.push(it); salvar(); fecharModal(); faixaEventos = ''; render();
     toast(`Vinculado a ${p.nome}.`);
