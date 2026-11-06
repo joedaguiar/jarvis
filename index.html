@@ -385,7 +385,8 @@ async function sair() {
   await gravar();
   await msalApp.logoutRedirect({ account: conta, postLogoutRedirectUri: REDIRECT });
 }
-async function token() {
+async function token(esc = SCOPES) {
+  if (esc !== SCOPES) return (await msalApp.acquireTokenSilent({ scopes: esc, account: conta })).accessToken;
   try { return (await msalApp.acquireTokenSilent({ scopes: SCOPES, account: conta })).accessToken; }
   catch (e) {
     if (e instanceof msal.InteractionRequiredAuthError) { await gravar(); await msalApp.acquireTokenRedirect({ scopes: SCOPES, account: conta }); }
@@ -397,15 +398,15 @@ let ativos = 0; const fila = [];
 async function vez() { if (ativos < 2) { ativos++; return; } await new Promise(r => fila.push(r)); ativos++; }
 function libera() { ativos--; const n = fila.shift(); if (n) n(); }
 const espera = ms => new Promise(r => setTimeout(r, ms));
-async function graph(method, path, body) {
+async function graph(method, path, body, escopos) {
   const url = path.startsWith('http') ? path : GRAPH + path;
   for (let tentativa = 0; ; tentativa++) {
-    const t = await token();
+    const t = await token(escopos || SCOPES);
     await vez();
     let r;
     try {
       r = await fetch(url, {
-        method, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', Prefer: `outlook.timezone="${(D && D.config.fuso) || 'E. South America Standard Time'}"` },
+        method, cache: 'no-store', headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', Prefer: `outlook.timezone="${(D && D.config.fuso) || 'E. South America Standard Time'}"` },
         body: body ? JSON.stringify(body) : undefined
       });
     } finally { libera(); }
@@ -468,7 +469,7 @@ async function carregarEventos(ini, fim, forcar) {
       const vis = calendarios.filter(c => (D.config.calendariosVisiveis || []).includes(c.id));
       const off = tzOff(), sd = encodeURIComponent(ymd(ini) + 'T00:00:00' + off), ed = encodeURIComponent(ymd(addDays(fim, 1)) + 'T00:00:00' + off);
       for (const c of vis) {
-        let url = `${calPath(c.id)}/calendarView?startDateTime=${sd}&endDateTime=${ed}&$top=250&$select=id,subject,start,end,isAllDay,location,organizer,webLink,onlineMeeting,seriesMasterId,isCancelled,showAs`;
+        let url = `${calPath(c.id)}/calendarView?startDateTime=${sd}&endDateTime=${ed}&$top=250&$select=id,subject,start,end,isAllDay,location,organizer,webLink,onlineMeeting,seriesMasterId,isCancelled,showAs,categories,isOnlineMeeting,attendees,isOrganizer`;
         while (url) {
           const j = await graph('GET', url);
           j.value.forEach(e => { if (!e.isCancelled) lista.push(Object.assign(e, { _cal: c })); });
@@ -484,9 +485,45 @@ async function carregarEventos(ini, fim, forcar) {
   }
   if (minha !== carregarEventos.seq) return; // chegou uma busca mais nova; descarta esta
   eventos = lista;
+  calsCarregados = new Set(lista.map(e => e._cal.id).concat(todosCals().filter(c => (D.config.calendariosVisiveis || []).includes(c.id) && (c.fonte === 'google' ? gOk() : conectado())).map(c => c.id)));
+  if (conectado() && !categorias && !categorias_tentou) carregarCategorias();
   render();
 }
 carregarEventos.seq = 0;
+let calsCarregados = new Set();
+/* categorias do Outlook (cores) */
+let categorias = null, categorias_tentou = false, categoriasPendente = false;
+const PRESET = ['#e74856','#ff8c00','#a0522d','#ffd700','#4caf50','#00a99d','#808000','#0078d4','#8764b8','#c30052','#6e8ba8','#4a5f73','#a0a0a0','#696969','#323232','#a4262c','#ca5010','#8e562e','#c19c00','#0b6a0b','#038387','#5c6d29','#004e8c','#5c2e91','#9b0062'];
+async function carregarCategorias() {
+  categorias_tentou = true;
+  try {
+    const j = await graph('GET', '/me/outlook/masterCategories', null, ['MailboxSettings.Read']);
+    categorias = {}; (j.value || []).forEach(c => { const i = +(String(c.color).replace('preset', '')); if (!isNaN(i) && PRESET[i]) categorias[c.displayName] = PRESET[i]; });
+    categoriasPendente = false; render();
+  } catch (e) { categoriasPendente = true; console.warn('categorias', e); }
+}
+async function ativarCategorias() { await gravar(); await msalApp.acquireTokenRedirect({ scopes: SCOPES.concat(['MailboxSettings.Read']), account: conta }); }
+const GCORES = { 1: '#7986cb', 2: '#33b679', 3: '#8e24aa', 4: '#e67c73', 5: '#f6bf26', 6: '#f4511e', 7: '#039be5', 8: '#616161', 9: '#3f51b5', 10: '#0b8043', 11: '#d50000' };
+function clarear(hex, f) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return hex;
+  const n = parseInt(m[1], 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v + (255 - v) * f));
+  return '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+}
+const ehReuniao = e => !!(e.isOnlineMeeting || (e.attendees && e.attendees.length) || e.onlineMeeting);
+function corEvento(e, base) {
+  if (e.categories && e.categories.length && categorias) { const c = e.categories.map(n => categorias[n]).find(Boolean); if (c) return c; }
+  if (e.gColor && GCORES[e.gColor]) return GCORES[e.gColor];
+  if (e._cal.padrao && ehReuniao(e)) return clarear(base, 0.4);
+  return base;
+}
+const SHOWAS = { free: 'Livre', tentative: 'Provisório', busy: 'Ocupado', oof: 'Ausência temporária', workingElsewhere: 'Trabalhando em outro lugar' };
+function estiloSA(sa, cor) {
+  if (sa === 'tentative') return `background:repeating-linear-gradient(135deg,${cor} 0 6px,${clarear(cor, .45)} 6px 12px);text-shadow:0 0 3px rgba(0,0,0,.55);`;
+  if (sa === 'free') return `background:#fff;color:${cor};border:1px solid ${cor};`;
+  if (sa === 'oof') return `background:${cor};box-shadow:inset 4px 0 0 #5c2e91;`;
+  if (sa === 'workingElsewhere') return `background:${cor};border:1px dashed #fff;`;
+  return `background:${cor};`;
+}
 function idsDoSistema() {
   const s = new Set();
   D.itens.forEach(it => { if (it.outlook && it.outlook.eventId) s.add(it.outlook.eventId); });
@@ -566,7 +603,7 @@ async function sincronizar(it) {
       if (it.outlook) await graph('PATCH', `${calPath(cal)}/events/${it.outlook.eventId}`, body);
       else { const r = await graph('POST', `${calPath(cal)}/events`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
     }
-    it.erroSync = '';
+    it.erroSync = ''; delete it._pend;
     if (it.vinculado) it.recImport = JSON.stringify(it.recorrencia);
   } catch (e) {
     it.erroSync = e.message; toast((alvoG ? 'Google: ' : 'Outlook: ') + e.message, true);
@@ -624,7 +661,7 @@ document.addEventListener('click', () => {
 }, true);
 async function gapi(method, path, body) {
   if (!gOk()) throw new Error('A conexão com o Google expirou. Clique em qualquer lugar para renovar.');
-  const r = await fetch(GAPI + path, { method, headers: { Authorization: 'Bearer ' + gToken, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(GAPI + path, { method, cache: 'no-store', headers: { Authorization: 'Bearer ' + gToken, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   if (r.status === 204) return null;
   const j = await r.json().catch(() => null);
   if (r.status === 401) { gToken = null; try { localStorage.removeItem('gtoken'); } catch { } throw new Error('A conexão com o Google expirou. Clique em qualquer lugar para renovar.'); }
@@ -647,7 +684,8 @@ function gNormalizar(ev, c) {
     end: { dateTime: dia ? ev.end.date + 'T00:00:00' : ev.end.dateTime.slice(0, 19) },
     location: { displayName: ev.location || '' }, webLink: ev.htmlLink,
     organizer: ev.organizer ? { emailAddress: { name: ev.organizer.displayName || ev.organizer.email } } : null,
-    onlineMeeting: ev.hangoutLink ? { joinUrl: ev.hangoutLink } : null, _cal: c
+    onlineMeeting: ev.hangoutLink ? { joinUrl: ev.hangoutLink } : null, _cal: c,
+    showAs: ev.transparency === 'transparent' ? 'free' : 'busy', gColor: ev.colorId, attendees: ev.attendees || []
   };
 }
 async function gEventos(ini, fim, lista) {
@@ -730,8 +768,12 @@ let filtroOff = new Set((() => { try { return JSON.parse(localStorage.getItem('f
 function gravarFiltro() { try { localStorage.setItem('filtroAgendas', JSON.stringify([...filtroOff])); } catch { } }
 function entradas(ini, fim) {
   const out = [];
+  const calReal = id => { const c = calObj(id); return c ? c.id : id; };
+  const porEvento = new Map(); // eventId -> item (itens cuja agenda foi carregada: mostra o evento real)
+  D.itens.forEach(it => { if (it.outlook && it.outlook.eventId && !it._pend && calsCarregados.has(calReal(it.outlook.calendarId))) porEvento.set(it.outlook.eventId, it); });
   D.itens.forEach(it => {
     if (filtrado(it)) return;
+    if (it.outlook && porEvento.get(it.outlook.eventId) === it) return; // vem do evento real abaixo
     const exc = it.excecoes || {};
     ocorrencias(it, it.recorrencia ? addDays(ini, -14) : ini, it.recorrencia ? addDays(fim, 14) : fim).forEach(d => {
       const x = exc[d];
@@ -744,12 +786,18 @@ function entradas(ini, fim) {
   });
   const meus = idsDoSistema();
   eventos.forEach(e => {
-    if (meus.has(e.rawId || e.id) || (e.seriesMasterId && meus.has(e.seriesMasterId))) return;
-    const ar = D.areas.find(a => a.calendarioId && a.calendarioId === e._cal.id);
+    const dono = porEvento.get(e.rawId || e.id) || (e.seriesMasterId && porEvento.get(e.seriesMasterId));
+    if (!dono && (meus.has(e.rawId || e.id) || (e.seriesMasterId && meus.has(e.seriesMasterId)))) return;
     if (filtroOff.has(chaveFiltro(e._cal.id))) return;
     const sd = e.start.dateTime.slice(0, 10), st = e.start.dateTime.slice(11, 16), en = e.end.dateTime.slice(11, 16);
     const ci = todosCals().indexOf(e._cal);
-    const base = { k: 'ev', e, titulo: e.subject || '(sem título)', cor: ar ? ar.cor : corCal(e._cal, ci), feito: false };
+    const corBase = corCal(e._cal, ci);
+    let base;
+    if (dono) {
+      if (!dono.recorrencia && !e.isAllDay && !dono.erroSync && (dono.data !== sd || dono.hora !== st)) { dono.data = sd; dono.hora = st; dono.duracao = Math.max(15, hm2min(en) - hm2min(st)); salvar(); }
+      if (dono.excecoes && dono.excecoes[sd] && dono.excecoes[sd].cancelada) return;
+      base = { k: 'item', it: dono, orig: sd, titulo: dono.vinculado ? (e.subject || dono.titulo) : dono.titulo, cor: corEvento(e, corBase), sa: e.showAs, feito: !!dono.concluidas[sd], ev: e };
+    } else base = { k: 'ev', e, titulo: e.subject || '(sem título)', cor: corEvento(e, corBase), sa: e.showAs, feito: false };
     if (e.isAllDay) {
       for (let d = parseYmd(sd); d < parseYmd(e.end.dateTime.slice(0, 10)); d = addDays(d, 1))
         if (d >= ini && d <= fim) out.push(Object.assign({}, base, { data: ymd(d), hora: '', fim: '' }));
@@ -764,7 +812,7 @@ function entradas(ini, fim) {
 function subtitulo(x) {
   if (x.k === 'ev') {
     const own = x.e._cal.fonte === 'google' ? 'Google · ' + x.e._cal.nome : (x.e._cal.padrao ? 'Outlook' : x.e._cal.nome);
-    return esc(own) + (x.e.location && x.e.location.displayName ? ' · ' + esc(x.e.location.displayName) : '');
+    return esc(own) + (x.sa && x.sa !== 'busy' && SHOWAS[x.sa] ? ' · ' + SHOWAS[x.sa] : '') + (x.e.categories && x.e.categories.length ? ' · ' + esc(x.e.categories.join(', ')) : '') + (x.e.location && x.e.location.displayName ? ' · ' + esc(x.e.location.displayName) : '');
   }
   const it = x.it, a = area(it.areaId), p = projeto(it.projetoId);
   return esc([a && a.nome, p && p.nome, TIPOS[it.tipo]].filter(Boolean).join(' · '));
@@ -864,7 +912,7 @@ function vSemana() {
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i)), lst = ent.filter(x => x.data === d), dd = addDays(ini, i);
     html += `<div class="dia ${d === hs ? 'hoje' : ''}"><h4><span style="text-transform:capitalize">${DIAS_L[dd.getDay()].replace('-feira', '')}</span><small>${dd.getDate()}/${pad(dd.getMonth() + 1)}</small></h4>
-      ${lst.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="border-color:${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? `<b>${x.hora}</b> ` : ''}${esc(x.titulo)}</div>`).join('') || '<div class="empty" style="font-size:12px">Livre</div>'}
+      ${lst.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="border-color:${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? `<b>${x.hora}</b> ` : ''}${esc(x.titulo)}${x.sa && x.sa !== 'busy' && SHOWAS[x.sa] ? ` <span class="tag">${SHOWAS[x.sa]}</span>` : ''}</div>`).join('') || '<div class="empty" style="font-size:12px">Livre</div>'}
       <button class="btn sm" style="margin-top:4px;width:100%" data-novo-data="${d}">+ adicionar</button></div>`;
   }
   return html + '</div>';
@@ -885,7 +933,7 @@ function vCalendario() {
     for (let i = 0; i < 42; i++) {
       const dd = addDays(ini, i), d = ymd(dd), l = ent.filter(x => x.data === d);
       g += `<div class="cel ${dd.getMonth() !== m0.getMonth() ? 'fora' : ''} ${d === hs ? 'hoje' : ''}" data-dia="${d}"><span class="n">${dd.getDate()}</span>
-        ${l.slice(0, 4).map(x => `<div class="adchip" style="background:${x.cor};${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? x.hora + ' ' : ''}${esc(x.titulo)}</div>`).join('')}
+        ${l.slice(0, 4).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? x.hora + ' ' : ''}${esc(x.titulo)}</div>`).join('')}
         ${l.length > 4 ? `<div class="mais">+${l.length - 4} mais</div>` : ''}</div>`;
     }
     return head.replace('<span class="lbl" id="calLbl"></span>', `<span class="lbl" style="text-transform:capitalize">${MESES[m0.getMonth()]} ${m0.getFullYear()}</span>`) + g + '</div>';
@@ -898,7 +946,7 @@ function vCalendario() {
   g += `<div class="ad" style="border-left:0;font-size:10px;color:var(--muted);padding-top:6px;text-align:right">dia todo</div>`;
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i));
-    g += `<div class="ad">${ent.filter(x => x.data === d && !x.hora).map(x => `<div class="adchip" style="background:${x.cor};${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${esc(x.titulo)}</div>`).join('')}</div>`;
+    g += `<div class="ad">${ent.filter(x => x.data === d && !x.hora).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${esc(x.titulo)}</div>`).join('')}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
@@ -908,7 +956,7 @@ function vCalendario() {
       const s = Math.max(hm2min(x.hora), H0 * 60), e = Math.max(Math.min(hm2min(x.fim || x.hora) || s + 30, H1 * 60), s + 20);
       const top = (s - H0 * 60) / 60 * PX, h = (e - s) / 60 * PX - 2;
       const movel = x.k === 'item' ? !x.it.leitura : (x.e._cal.podeEditar && !x.e.isAllDay);
-      return `<div class="ev ${x.feito ? 'done' : ''} ${movel ? 'movel' : ''}" style="top:${top}px;height:${h}px;left:calc(${x._c / x._n * 100}% + 1px);width:calc(${100 / x._n}% - 3px);background:${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}" data-orig="${x.orig}"` : `data-ev="${esc(x.e.id)}"`} data-ini="${hm2min(x.hora)}" data-dur="${hm2min(x.fim || x.hora) - hm2min(x.hora)}" data-dia="${x.data}"><b>${x.hora}</b> ${esc(x.titulo)}${movel ? '<div class="rs"></div>' : ''}</div>`;
+      return `<div class="ev ${x.feito ? 'done' : ''} ${movel ? 'movel' : ''}" title="${esc(x.titulo + (x.sa && SHOWAS[x.sa] ? ' · ' + SHOWAS[x.sa] : ''))}" style="top:${top}px;height:${h}px;left:calc(${x._c / x._n * 100}% + 1px);width:calc(${100 / x._n}% - 3px);${estiloSA(x.sa, x.cor)}" ${x.k === 'item' ? `data-item="${x.it.id}" data-orig="${x.orig}"` : `data-ev="${esc(x.e.id)}"`} data-ini="${hm2min(x.hora)}" data-dur="${hm2min(x.fim || x.hora) - hm2min(x.hora)}" data-dia="${x.data}"><b>${x.hora}</b> ${esc(x.titulo)}${movel ? '<div class="rs"></div>' : ''}</div>`;
     }).join('')}${d === hs ? `<div class="nowline" id="nowline"></div>` : ''}</div>`;
   }
   return head.replace('<span class="lbl" id="calLbl"></span>', `<span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span>`) + g + '</div>';
@@ -996,6 +1044,7 @@ function vConfig() {
       ${erroOutlook ? `<p class="tag err" style="display:block;padding:8px;margin-top:10px">${esc(erroOutlook)}</p>` : ''}
       <p class="hint" style="margin-top:10px">Aplicativo: ${APP.clientId}<br>Endereço de retorno: ${esc(REDIRECT)}</p>
     </div>
+    ${categoriasPendente ? `<div class="card"><h3>Cores das categorias do Outlook</h3><p>Para usar as cores das suas categorias, o sistema precisa de mais uma permissão (ler as configurações da caixa de correio).</p><button class="btn pri" data-acao="ativarCat">Ativar cores das categorias</button></div>` : ''}
     <div class="card"><h3>Google Agenda</h3>
       ${gCfg().ativo ? `<p>${gOk() ? 'Conectado' : 'Conexão expirada (renova no próximo clique)'}${gCfg().email ? ' como <b>' + esc(gCfg().email) + '</b>' : ''}.</p><button class="btn" data-acao="gEntrar">Reconectar</button> <button class="btn dan" data-acao="gSair">Desconectar</button>`
       : `<p>Conecte sua conta do Gmail para ver e editar as agendas do Google (Treinos, Refeições, JF…).</p><button class="btn pri" data-acao="gEntrar" ${gClientId() ? '' : 'disabled'}>Conectar Google</button>`}
@@ -1119,6 +1168,7 @@ async function salvarItemModal() {
     calendarioId: $('#iCal').value, lembrete: Math.max(0, +$('#iLemb').value || 0), notas: $('#iNotas').value
   });
   it.sincronizar = !!it.data && !it.leitura;
+  if (it.sincronizar) it._pend = true;
   it.areaId = areaDoItem(it);
   D.config.ultimoCal = it.calendarioId;
   if (novo) D.itens.push(it);
@@ -1141,7 +1191,7 @@ function modalEvento(e) {
   const sd = e.start.dateTime.slice(0, 10), st = e.start.dateTime.slice(11, 16), en = e.end.dateTime.slice(11, 16);
   const join = e.onlineMeeting && e.onlineMeeting.joinUrl;
   abrirModal(`<h3>${esc(e.subject || '(sem título)')}</h3>
-    <p class="hint">Evento ${c.fonte === 'google' ? 'do Google' : 'do Outlook'} · calendário <b>${esc(c.nome)}</b>${e.organizer ? ' · organizador: ' + esc(e.organizer.emailAddress.name) : ''}${e.seriesMasterId ? ' · faz parte de uma série' : ''}</p>
+    <p class="hint">Evento ${c.fonte === 'google' ? 'do Google' : 'do Outlook'} · calendário <b>${esc(c.nome)}</b>${e.organizer ? ' · organizador: ' + esc(e.organizer.emailAddress.name) : ''}${e.seriesMasterId ? ' · faz parte de uma série' : ''}${e.showAs && SHOWAS[e.showAs] ? ' · <b>' + SHOWAS[e.showAs] + '</b>' : ''}${e.categories && e.categories.length ? ' · categorias: ' + esc(e.categories.join(', ')) : ''}</p>
     ${edit ? `<div class="f"><label>Título</label><input id="eTit" value="${esc(e.subject)}"></div>
     <div class="fr"><div class="f"><label>Data</label><input type="date" id="eData" value="${sd}"></div>${e.isAllDay ? '' : `<div class="f"><label>Início</label><input type="time" id="eIni" value="${st}"></div><div class="f"><label>Fim</label><input type="time" id="eFim" value="${en}"></div>`}</div>
     <div class="f"><label>Local</label><input id="eLocal" value="${esc(e.location && e.location.displayName)}"></div>
@@ -1258,10 +1308,11 @@ document.addEventListener('click', async ev => {
     case 'calHoje': refCal = hoje0(); return render();
     case 'modoSemana': modoCal = 'semana'; return render();
     case 'modoMes': modoCal = 'mes'; return render();
-    case 'recarregar': faixaEventos = ''; calendarios = []; calendariosG = []; calsPromessa = null; erroOutlook = ''; erroGoogle = ''; return render();
+    case 'recarregar': faixaEventos = ''; calendarios = []; calendariosG = []; categorias_tentou = false; categorias = null; calsPromessa = null; erroOutlook = ''; erroGoogle = ''; return render();
     case 'gEntrar': return gEntrar(!gCfg().ativo);
     case 'gSair': return gSair();
     case 'gDiag': return gDiagnostico();
+    case 'ativarCat': return ativarCategorias();
     case 'abrirFiltro': filtroAberto = !filtroAberto; return renderFiltros();
     case 'filtroTodas': filtroOff.clear(); gravarFiltro(); return render();
     case 'filtroNenhuma': gruposFiltro().forEach(g => filtroOff.add(g.k)); gravarFiltro(); return render();
@@ -1433,7 +1484,7 @@ async function moverNoCalendario(el, dia, ini, dur, diaAntigo) {
   }
   const it = D.itens.find(i => i.id === el.dataset.item); if (!it) return render();
   if (!it.recorrencia) {
-    it.data = dia; it.hora = min2hm(ini); it.duracao = dur; salvar(); render();
+    it.data = dia; it.hora = min2hm(ini); it.duracao = dur; if (it.outlook) it._pend = true; salvar(); render();
     if (it.sincronizar || it.outlook) { await sincronizar(it); salvar(); faixaEventos = ''; render(); }
     return;
   }
@@ -1449,8 +1500,9 @@ async function confirmarMover(qual) {
   if (qual === 'um') {
     it.excecoes = it.excecoes || {};
     it.excecoes[orig] = { data: dia, hora: min2hm(ini), duracao: dur };
+    if (it.outlook) it._pend = true;
     salvar(); render();
-    if (it.sincronizar && it.outlook) { try { await moverInstancia(it, orig, dia, ini, dur); toast('Agenda atualizada (só este dia).'); } catch (e) { toast('Agenda: ' + e.message, true); } faixaEventos = ''; render(); }
+    if (it.sincronizar && it.outlook) { try { await moverInstancia(it, orig, dia, ini, dur); delete it._pend; toast('Agenda atualizada (só este dia).'); } catch (e) { toast('Agenda: ' + e.message, true); } salvar(); faixaEventos = ''; render(); }
     return;
   }
   // série: muda horário/duração; se mudou de dia, desloca os dias da repetição
@@ -1463,6 +1515,7 @@ async function confirmarMover(qual) {
     if (r.freq === 'mensal' && r.modoMensal === 'posicao') r.diaSemana = ((+r.diaSemana + delta) % 7 + 7) % 7;
   }
   it.excecoes = {};
+  if (it.outlook) it._pend = true;
   salvar(); render();
   if (it.sincronizar || it.outlook) { await sincronizar(it); salvar(); faixaEventos = ''; render(); }
 }
