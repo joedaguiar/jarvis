@@ -249,7 +249,21 @@ function areaDoItem(it) {
   const cal = calendarioDoItem(it), a = D.areas.find(a => a.calendarioId && a.calendarioId === cal);
   return a ? a.id : (it.areaId || '');
 }
-const filtrado = it => filtroOff.has(areaDoItem(it) || 'outlook');
+function chaveFiltro(calId) {
+  const c = calObj(calId); if (!c) return 'sem';
+  const g = (D.config.gruposCal || {})[c.id];
+  return g ? 'grp:' + g : c.id;
+}
+function gruposFiltro() {
+  const vis = new Set(D.config.calendariosVisiveis || []), l = todosCals(), m = new Map();
+  l.filter(c => vis.has(c.id)).forEach(c => {
+    const k = chaveFiltro(c.id), g = (D.config.gruposCal || {})[c.id];
+    if (!m.has(k)) m.set(k, { k, nome: g || ((c.fonte === 'google' ? 'Google · ' : '') + c.nome), cor: corCal(c, l.indexOf(c)), n: 0 });
+    m.get(k).n++;
+  });
+  return [...m.values()].sort((a, b) => a.nome.localeCompare(b.nome));
+}
+const filtrado = it => filtroOff.has(chaveFiltro(calendarioDoItem(it)));
 
 const APP = { clientId: '10f56873-dde9-4d8c-9b53-65e4cb2326ab', tenantId: '3c50769a-f2c3-45de-a848-dac895975f88' };
 const GRAPH = 'https://graph.microsoft.com/v1.0';
@@ -425,6 +439,11 @@ async function _carregarCalendarios() {
     for (const g of gs) add((await graph('GET', `/me/calendarGroups/${encodeURIComponent(g.id)}/calendars?${sel}`)).value, g.name);
   } catch (e) { console.warn('grupos de calendário', e); }
   calendarios = [...mapa.values()];
+  if (!D.config.gruposIniciado) {
+    D.config.gruposCal = D.config.gruposCal || {};
+    calendarios.forEach(c => { if (/rodrigo nunes|^particular$|medi[cç][oõ]es obras/i.test(c.nome.trim())) D.config.gruposCal[c.id] = 'Rodrigo Nunes'; });
+    D.config.gruposIniciado = true; salvar();
+  }
   // calendários novos entram visíveis
   const conhecidos = new Set(D.config.calendariosConhecidos || D.config.calendariosVisiveis || []);
   const vis = new Set(D.config.calendariosVisiveis || []);
@@ -707,7 +726,8 @@ async function gDiagnostico() {
 const todosCals = () => [...calendarios, ...calendariosG];
 
 /* ================= entradas (itens + eventos) ================= */
-let filtroOff = new Set(); // ids de áreas desligadas; 'outlook' para eventos sem área
+let filtroOff = new Set((() => { try { return JSON.parse(localStorage.getItem('filtroAgendas')) || []; } catch { return []; } })());
+function gravarFiltro() { try { localStorage.setItem('filtroAgendas', JSON.stringify([...filtroOff])); } catch { } }
 function entradas(ini, fim) {
   const out = [];
   D.itens.forEach(it => {
@@ -726,7 +746,7 @@ function entradas(ini, fim) {
   eventos.forEach(e => {
     if (meus.has(e.rawId || e.id) || (e.seriesMasterId && meus.has(e.seriesMasterId))) return;
     const ar = D.areas.find(a => a.calendarioId && a.calendarioId === e._cal.id);
-    if (ar ? filtroOff.has(ar.id) : filtroOff.has('outlook')) return;
+    if (filtroOff.has(chaveFiltro(e._cal.id))) return;
     const sd = e.start.dateTime.slice(0, 10), st = e.start.dateTime.slice(11, 16), en = e.end.dateTime.slice(11, 16);
     const ci = todosCals().indexOf(e._cal);
     const base = { k: 'ev', e, titulo: e.subject || '(sem título)', cor: ar ? ar.cor : corCal(e._cal, ci), feito: false };
@@ -781,10 +801,18 @@ function render() {
   if (vista === 'calendario' && modoCal === 'semana') posicionarCalendario();
   $('#view').scrollTop = sc;
 }
+let filtroAberto = false;
 function renderFiltros() {
   const show = ['hoje', 'semana', 'calendario'].includes(vista);
-  $('#filtros').innerHTML = !show ? '' : D.areas.map(a => `<button class="chip ${filtroOff.has(a.id) ? 'off' : ''}" data-filtro="${a.id}"><span class="sw" style="background:${a.cor}"></span>${esc(a.nome)}</button>`).join('') +
-    (conectado() || gOk() ? `<button class="chip ${filtroOff.has('outlook') ? 'off' : ''}" data-filtro="outlook"><span class="sw" style="background:#94a3b8"></span>Outras agendas</button>` : '');
+  if (!show) { $('#filtros').innerHTML = ''; return; }
+  const gs = gruposFiltro(), on = gs.filter(g => !filtroOff.has(g.k)).length;
+  $('#filtros').innerHTML = `<div style="position:relative">
+    <button class="chip" data-acao="abrirFiltro" title="Filtrar agendas">${gs.slice(0, 6).map(g => `<span class="sw" style="background:${g.cor};${filtroOff.has(g.k) ? 'opacity:.25' : ''}"></span>`).join('')}
+      Agendas ${on === gs.length ? '(todas)' : `(${on} de ${gs.length})`} ▾</button>
+    ${filtroAberto ? `<div id="filtroPop" style="position:absolute;right:0;top:34px;z-index:40;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:8px;min-width:240px;max-height:60vh;overflow:auto">
+      ${gs.map(g => `<label class="cb" style="margin:0;padding:6px 8px;border-radius:6px;cursor:pointer"><input type="checkbox" data-filtro="${esc(g.k)}" ${filtroOff.has(g.k) ? '' : 'checked'}><span class="sw" style="background:${g.cor}"></span>${esc(g.nome)}${g.n > 1 ? `<span class="hint">(${g.n})</span>` : ''}</label>`).join('') || '<div class="empty" style="padding:8px">Nenhuma agenda exibida.</div>'}
+      <div style="display:flex;gap:6px;border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><button class="btn sm" data-acao="filtroTodas">Todas</button><button class="btn sm" data-acao="filtroNenhuma">Nenhuma</button><span style="flex:1"></span><button class="btn sm" data-v="config" data-acao="irConfig">Agrupar…</button></div>
+    </div>` : ''}</div>`;
 }
 function renderStatus() {
   const el = $('#outlookStatus');
@@ -956,8 +984,8 @@ function secoesItens(itens, ctx) {
 function vConfig() {
   const c = D.config;
   const listaCals = todosCals();
-  const cals = (conectado() || gOk()) ? (listaCals.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Pode editar</b></td></tr>${listaCals.map((k, i) => `<tr><td><span class="sw" style="background:${corCal(k, i)}"></span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
-      <td><input type="checkbox" data-calvis="${esc(k.id)}" ${(c.calendariosVisiveis || []).includes(k.id) ? 'checked' : ''}></td><td>${k.podeEditar ? 'Sim' : 'Só leitura'}</td></tr>`).join('')}</table>` : '<div class="empty">Carregando calendários…</div>') : '<div class="empty">Conecte o Outlook ou o Google para escolher os calendários.</div>';
+  const cals = (conectado() || gOk()) ? (listaCals.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Grupo no filtro</b></td><td><b>Pode editar</b></td></tr>${listaCals.map((k, i) => `<tr><td><span class="sw" style="background:${corCal(k, i)}"></span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
+      <td><input type="checkbox" data-calvis="${esc(k.id)}" ${(c.calendariosVisiveis || []).includes(k.id) ? 'checked' : ''}></td><td><input data-calgrupo="${esc(k.id)}" value="${esc((c.gruposCal || {})[k.id] || '')}" placeholder="—" style="width:130px;border:1px solid #cfd4de;border-radius:6px;padding:3px 6px"></td><td>${k.podeEditar ? 'Sim' : 'Só leitura'}</td></tr>`).join('')}</table>` : '<div class="empty">Carregando calendários…</div>') : '<div class="empty">Conecte o Outlook ou o Google para escolher os calendários.</div>';
   if (conectado() && !calendarios.length && !vConfig._tentou) vConfig._tentou = true, carregarCalendarios().then(render).catch(e => { erroOutlook = e.message; });
   if (gOk() && !calendariosG.length && !vConfig._tentouG) vConfig._tentouG = true, gCarregarCalendarios().then(render).catch(e => { erroGoogle = e.message; });
   const opcCal = sel => `<option value="">Calendário principal do Outlook</option>` + listaCals.filter(k => k.podeEditar && !k.padrao).map(k => `<option value="${esc(k.id)}" ${sel === k.id ? 'selected' : ''}>${k.fonte === 'google' ? 'Google · ' : ''}${esc(k.nome)}</option>`).join('');
@@ -981,7 +1009,7 @@ function vConfig() {
       ${D.areas.map(a => `<div class="f"><label>${esc(a.nome)}: calendário vinculado</label><select data-areacal="${a.id}">${opcCal(a.calendarioId)}${listaCals.filter(k => !k.podeEditar).map(k => `<option value="${esc(k.id)}" ${a.calendarioId === k.id ? 'selected' : ''}>${esc(k.nome)} (só leitura)</option>`).join('')}</select></div>`).join('')}
       <p class="hint">Se uma empresa tiver um calendário vinculado (do Outlook ou do Google), os eventos desse calendário ganham a cor da empresa, e os itens dela são gravados lá (quando você tem permissão de edição).</p>
     </div></div><div>
-    <div class="card"><h3>Calendários exibidos</h3>${cals}</div>
+    <div class="card"><h3>Calendários exibidos</h3>${cals}<p class="hint">Agendas com o mesmo <b>grupo</b> aparecem como uma só no filtro do topo.</p></div>
     <div class="card"><h3>Lembretes</h3>
       <div class="f"><label>Lembrete padrão (minutos antes)</label><input type="number" id="cfgLemb" min="0" value="${c.lembretePadrao}"></div>
       <label class="cb"><input type="checkbox" id="cfgNotif" ${c.notificacoes ? 'checked' : ''}> Notificações do Windows para itens que não estão no Outlook</label>
@@ -1196,7 +1224,8 @@ document.addEventListener('click', async ev => {
     return;
   }
   const fi = t.closest('[data-filtro]');
-  if (fi) { const k = fi.dataset.filtro; filtroOff.has(k) ? filtroOff.delete(k) : filtroOff.add(k); return render(); }
+  if (fi) return; // tratado no change
+  if (filtroAberto && !t.closest('#filtroPop') && !t.closest('[data-acao=abrirFiltro]')) { filtroAberto = false; renderFiltros(); }
   const iEl = t.closest('[data-item]');
   if (iEl) { ev.stopPropagation(); const it = D.itens.find(i => i.id === iEl.dataset.item); if (it) modalItem(it, false); return; }
   const eEl = t.closest('[data-ev]');
@@ -1233,6 +1262,10 @@ document.addEventListener('click', async ev => {
     case 'gEntrar': return gEntrar(!gCfg().ativo);
     case 'gSair': return gSair();
     case 'gDiag': return gDiagnostico();
+    case 'abrirFiltro': filtroAberto = !filtroAberto; return renderFiltros();
+    case 'filtroTodas': filtroOff.clear(); gravarFiltro(); return render();
+    case 'filtroNenhuma': gruposFiltro().forEach(g => filtroOff.add(g.k)); gravarFiltro(); return render();
+    case 'irConfig': filtroAberto = false; return irPara('config');
     case 'vincularEv': return vincularEvento();
     case 'copiarDiag': { const t = $('#diagTxt'); t.select(); try { await navigator.clipboard.writeText(t.value); toast('Copiado.'); } catch { document.execCommand('copy'); toast('Copiado.'); } return; }
     case 'gSalvarId': gCfg().clientId = $('#gCid').value.trim(); salvar(); toast('ID do Google salvo.'); return render();
@@ -1270,6 +1303,8 @@ document.addEventListener('click', async ev => {
 });
 document.addEventListener('change', ev => {
   const t = ev.target;
+  if (t.matches('[data-filtro]')) { const k = t.dataset.filtro; t.checked ? filtroOff.delete(k) : filtroOff.add(k); gravarFiltro(); return render(); }
+  if (t.matches('[data-calgrupo]')) { D.config.gruposCal = D.config.gruposCal || {}; const v = t.value.trim(); if (v) D.config.gruposCal[t.dataset.calgrupo] = v; else delete D.config.gruposCal[t.dataset.calgrupo]; salvar(); return; }
   if (t.matches('[data-calvis]')) {
     const s = new Set(D.config.calendariosVisiveis || []); t.checked ? s.add(t.dataset.calvis) : s.delete(t.dataset.calvis);
     D.config.calendariosVisiveis = [...s]; faixaEventos = ''; salvar(); return;
