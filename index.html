@@ -70,7 +70,9 @@ body.mini #outlookStatus .dot{margin:3px}
 .tag.late{background:#fff4e0;color:var(--warn)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
 /* semana */
-.semana{display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:10px}
+.semana{display:grid;grid-template-columns:var(--cols,repeat(7,minmax(0,1fr)));gap:10px}
+.dia{min-width:0;overflow:hidden}
+.ent{overflow:hidden;text-overflow:ellipsis}
 .dia{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px;min-height:160px}
 .dia.hoje{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .dia h4{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between;align-items:baseline}
@@ -81,10 +83,10 @@ body.mini #outlookStatus .dot{margin:3px}
 /* calendario */
 .cal-head{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .cal-head .lbl{font-weight:600;font-size:16px;margin:0 8px;min-width:220px}
-.wk{display:grid;grid-template-columns:52px repeat(7,1fr);background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.wk{display:grid;grid-template-columns:var(--cols,52px repeat(7,minmax(0,1fr)));background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
 .wk .hd{padding:8px 6px;text-align:center;border-bottom:1px solid var(--line);font-size:12.5px;background:#fafbfc}
 .wk .hd.hoje{color:var(--accent);font-weight:700}
-.wk .ad{border-bottom:1px solid var(--line);min-height:26px;padding:2px;border-left:1px solid var(--line)}
+.wk .ad{min-width:0;overflow:hidden;border-bottom:1px solid var(--line);min-height:26px;padding:2px;border-left:1px solid var(--line)}
 .wk .hrs{position:relative}
 .wk .hr{height:48px;font-size:11px;color:var(--muted);text-align:right;padding-right:6px;transform:translateY(-7px)}
 .wk .col{position:relative;border-left:1px solid var(--line);background:repeating-linear-gradient(#fff 0 47px,#eef0f3 47px 48px)}
@@ -100,9 +102,9 @@ body.mini #outlookStatus .dot{margin:3px}
 body.arrastando,body.arrastando *{user-select:none!important}
 .adchip{font-size:11.5px;color:#fff;border-radius:4px;padding:1px 5px;margin:1px 0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nowline{position:absolute;left:0;right:0;height:2px;background:#e53935;z-index:3}
-.mes{display:grid;grid-template-columns:repeat(7,1fr);background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.mes{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
 .mes .hd{padding:6px;text-align:center;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
-.mes .cel{min-height:104px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px;cursor:pointer}
+.mes .cel{min-width:0;overflow:hidden;min-height:104px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px;cursor:pointer}
 .mes .cel.fora{background:#fafbfc;color:#aab}
 .mes .cel.hoje .n{background:var(--accent);color:#fff;border-radius:50%}
 .mes .n{display:inline-block;width:22px;height:22px;text-align:center;line-height:22px;font-size:12px}
@@ -967,17 +969,26 @@ function vSemana() {
   carregarEventos(ini, fim);
   const ent = entradas(ini, fim);
   let html = `<div class="cal-head"><button class="btn" data-acao="semAnt">‹</button><button class="btn" data-acao="semHoje">Esta semana</button><button class="btn" data-acao="semProx">›</button>
-    <span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span><span style="flex:1"></span><span id="atualizado" class="hint"></span>${conectado() || gOk() ? `<button class="btn ${carregando ? 'girando' : ''}" data-acao="recarregar" title="Buscar as agendas de novo">⟳</button>` : ''}</div><div class="semana">`;
+    <span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span><span style="flex:1"></span><span id="atualizado" class="hint"></span>${conectado() || gOk() ? `<button class="btn ${carregando ? 'girando' : ''}" data-acao="recarregar" title="Buscar as agendas de novo">⟳</button>` : ''}</div><div class="semana" style="--cols:${colunasSemana(ini, ent)}">`;
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i)), lst = ent.filter(x => x.data === d), dd = addDays(ini, i);
-    html += `<div class="dia ${d === hs ? 'hoje' : ''}"><h4><span style="text-transform:capitalize">${DIAS_L[dd.getDay()].replace('-feira', '')}</span><small>${dd.getDate()}/${pad(dd.getMonth() + 1)}</small></h4>
-      ${lst.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="border-color:${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? `<b>${x.hora}</b> ` : ''}${esc(x.titulo)}${x.sa && x.sa !== 'busy' && SHOWAS[x.sa] ? ` <span class="tag">${SHOWAS[x.sa]}</span>` : ''}</div>`).join('') || '<div class="empty" style="font-size:12px">Livre</div>'}
-      <button class="btn sm" style="margin-top:4px;width:100%" data-novo-data="${d}">+ adicionar</button></div>`;
+    const estreito = (dd.getDay() === 0 || dd.getDay() === 6) && !lst.length;
+    html += `<div class="dia ${d === hs ? 'hoje' : ''}" ${estreito ? 'style="padding:10px 6px"' : ''}><h4 ${estreito ? 'style="flex-direction:column;align-items:center;gap:2px"' : ''}><span style="text-transform:capitalize">${estreito ? DIAS[dd.getDay()] : DIAS_L[dd.getDay()].replace('-feira', '')}</span><small>${dd.getDate()}/${pad(dd.getMonth() + 1)}</small></h4>
+      ${lst.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="border-color:${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? `<b>${x.hora}</b> ` : ''}${esc(x.titulo)}${x.sa && x.sa !== 'busy' && SHOWAS[x.sa] ? ` <span class="tag">${SHOWAS[x.sa]}</span>` : ''}</div>`).join('') || (estreito ? '' : '<div class="empty" style="font-size:12px">Livre</div>')}
+      <button class="btn sm" style="margin-top:4px;width:100%" data-novo-data="${d}" title="Adicionar">${estreito ? '+' : '+ adicionar'}</button></div>`;
   }
   return html + '</div>';
 }
 
 const H0 = 5, H1 = 24, PX = 48;
+function colunasSemana(ini, ent, prefixo) {
+  const cols = [];
+  for (let i = 0; i < 7; i++) {
+    const dd = addDays(ini, i), d = ymd(dd), fds = dd.getDay() === 0 || dd.getDay() === 6;
+    cols.push(fds && !ent.some(x => x.data === d) ? 'minmax(0,.35fr)' : 'minmax(0,1fr)');
+  }
+  return (prefixo ? prefixo + ' ' : '') + cols.join(' ');
+}
 function vCalendario() {
   const head = `<div class="cal-head"><button class="btn" data-acao="calAnt">‹</button><button class="btn" data-acao="calHoje">Hoje</button><button class="btn" data-acao="calProx">›</button>
     <span class="lbl" id="calLbl"></span><span style="flex:1"></span>
@@ -1000,7 +1011,7 @@ function vCalendario() {
   const ini = domingo(refCal), fim = addDays(ini, 6);
   carregarEventos(ini, fim);
   const ent = entradas(ini, fim);
-  let g = `<div class="wk"><div class="hd"></div>`;
+  let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent, '52px')}"><div class="hd"></div>`;
   for (let i = 0; i < 7; i++) { const dd = addDays(ini, i); g += `<div class="hd ${ymd(dd) === hs ? 'hoje' : ''}">${DIAS[dd.getDay()]} ${dd.getDate()}</div>`; }
   g += `<div class="ad" style="border-left:0;font-size:10px;color:var(--muted);padding-top:6px;text-align:right">dia todo</div>`;
   for (let i = 0; i < 7; i++) {
