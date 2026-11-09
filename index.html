@@ -963,12 +963,14 @@ function vHoje() {
   </div>
   <div class="grid2">
     <div>
+      ${(() => { const pc = pendenciasControle(); return pc.length ? `<div class="card"><h3>Pendências de controle (${pc.length})</h3>${pc.map(x => linhaCtl(x)).join('')}</div>` : ''; })()}
       ${atr.length ? `<div class="card"><h3>Atrasados</h3>${atr.map(x => linha(x, { dataNaLinha: true, late: true })).join('')}</div>` : ''}
       <div class="card"><h3>Hoje</h3>${hojeL.length ? hojeL.map(x => linha(x)).join('') : '<div class="empty">Nada marcado para hoje.</div>'}</div>
       ${semData.length ? `<div class="card"><h3>Tarefas sem data</h3>${semData.map(it => `<div class="row"><input type="checkbox" class="chk" data-conc="${it.id}|-"><div class="bar" style="background:${corItem(it)}"></div><div class="txt" data-item="${it.id}"><div class="t">${esc(it.titulo)}</div><div class="s">${subtitulo({ k: 'item', it })}</div></div></div>`).join('')}</div>` : ''}
     </div>
     <div>
       <div class="card"><h3>Amanhã · ${fmtData(ymd(addDays(h, 1)))}</h3>${amanha.length ? amanha.map(x => linha(x)).join('') : '<div class="empty">Nada marcado.</div>'}</div>
+      ${(() => { const pc = controleEntre(addDays(h, 1), addDays(h, 7)).filter(x => !x.feito); return pc.length ? `<div class="card"><h3>Controle · próximos 7 dias</h3>${pc.map(x => linhaCtl(x)).join('')}</div>` : ''; })()}
       <div class="card"><h3>Próximas entregas (14 dias)</h3>${prox.length ? prox.map(x => linha(x, { dataNaLinha: true })).join('') : '<div class="empty">Nenhuma entrega nos próximos 14 dias.</div>'}</div>
     </div>
   </div>`;
@@ -977,14 +979,16 @@ function vHoje() {
 function vSemana() {
   const ini = refSemana, fim = addDays(ini, 6), hs = ymd(hoje0());
   carregarEventos(ini, fim);
-  const ent = entradas(ini, fim);
+  const ent = entradas(ini, fim), ctlSem = controleEntre(ini, fim);
   let html = `<div class="cal-head"><button class="btn" data-acao="semAnt">‹</button><button class="btn" data-acao="semHoje">Esta semana</button><button class="btn" data-acao="semProx">›</button>
-    <span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span><span style="flex:1"></span><span id="atualizado" class="hint"></span>${conectado() || gOk() ? `<button class="btn ${carregando ? 'girando' : ''}" data-acao="recarregar" title="Buscar as agendas de novo">⟳</button>` : ''}</div><div class="semana" style="--cols:${colunasSemana(ini, ent)}">`;
+    <span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span><span style="flex:1"></span><span id="atualizado" class="hint"></span>${conectado() || gOk() ? `<button class="btn ${carregando ? 'girando' : ''}" data-acao="recarregar" title="Buscar as agendas de novo">⟳</button>` : ''}</div><div class="semana" style="--cols:${colunasSemana(ini, ent.concat(ctlSem))}">`;
   for (let i = 0; i < 7; i++) {
-    const d = ymd(addDays(ini, i)), lst = ent.filter(x => x.data === d), dd = addDays(ini, i);
-    const estreito = (dd.getDay() === 0 || dd.getDay() === 6) && !lst.length;
+    const d = ymd(addDays(ini, i)), dd = addDays(ini, i), ctlD = ctlSem.filter(x => x.data === d), lst = ent.filter(x => x.data === d);
+    const estreito = (dd.getDay() === 0 || dd.getDay() === 6) && !lst.length && !ctlD.length;
     html += `<div class="dia ${d === hs ? 'hoje' : ''}" ${estreito ? 'style="padding:10px 6px"' : ''}><h4 ${estreito ? 'style="flex-direction:column;align-items:center;gap:2px"' : ''}><span style="text-transform:capitalize">${estreito ? DIAS[dd.getDay()] : DIAS_L[dd.getDay()].replace('-feira', '')}</span><small>${dd.getDate()}/${pad(dd.getMonth() + 1)}</small></h4>
-      ${lst.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="border-color:${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? `<b>${x.hora}</b> ` : ''}${esc(x.titulo)}${x.sa && x.sa !== 'busy' && SHOWAS[x.sa] ? ` <span class="tag">${SHOWAS[x.sa]}</span>` : ''}</div>`).join('') || (estreito ? '' : '<div class="empty" style="font-size:12px">Livre</div>')}
+      ${lst.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="border-color:${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? `<b>${x.hora}</b> ` : ''}${esc(x.titulo)}${x.sa && x.sa !== 'busy' && SHOWAS[x.sa] ? ` <span class="tag">${SHOWAS[x.sa]}</span>` : ''}</div>`).join('')}
+      ${ctlD.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="border-color:${corCtl(x.p)};border-left-style:dashed" data-selproj="${x.p.id}" title="${esc(x.p.nome + ' · ' + x.titulo)}">📋 <b>${esc(x.p.nome)}</b>: ${esc(x.titulo)}</div>`).join('')}
+      ${lst.length || ctlD.length || estreito ? '' : '<div class="empty" style="font-size:12px">Livre</div>'}
       <button class="btn sm" style="margin-top:4px;width:100%" data-novo-data="${d}" title="Adicionar">${estreito ? '+' : '+ adicionar'}</button></div>`;
   }
   return html + '</div>';
@@ -1008,11 +1012,11 @@ function vCalendario() {
   if (modoCal === 'mes') {
     const m0 = new Date(refCal.getFullYear(), refCal.getMonth(), 1), ini = domingo(m0), fim = addDays(ini, 41);
     carregarEventos(ini, fim);
-    const ent = entradas(ini, fim);
+    const ent = entradas(ini, fim), ctlMes = controleEntre(ini, fim);
     let g = `<div class="mes">${[0, 1, 2, 3, 4, 5, 6].map(i => `<div class="hd">${DIAS[i]}</div>`).join('')}`;
     for (let i = 0; i < 42; i++) {
-      const dd = addDays(ini, i), d = ymd(dd), l = ent.filter(x => x.data === d);
-      g += `<div class="cel ${dd.getMonth() !== m0.getMonth() ? 'fora' : ''} ${d === hs ? 'hoje' : ''}" data-dia="${d}"><span class="n">${dd.getDate()}</span>
+      const dd = addDays(ini, i), d = ymd(dd), l = ent.filter(x => x.data === d), nCtl = ctlMes.filter(x => x.data === d && !x.feito).length;
+      g += `<div class="cel ${dd.getMonth() !== m0.getMonth() ? 'fora' : ''} ${d === hs ? 'hoje' : ''}" data-dia="${d}"><span class="n">${dd.getDate()}</span>${nCtl ? `<span class="tag" title="Pendências de controle" style="float:right">📋 ${nCtl}</span>` : ''}
         ${l.slice(0, 4).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? x.hora + ' ' : ''}${esc(x.titulo)}</div>`).join('')}
         ${l.length > 4 ? `<div class="mais">+${l.length - 4} mais</div>` : ''}</div>`;
     }
@@ -1020,13 +1024,15 @@ function vCalendario() {
   }
   const ini = domingo(refCal), fim = addDays(ini, 6);
   carregarEventos(ini, fim);
-  const ent = entradas(ini, fim);
-  let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent, '52px')}"><div class="hd"></div>`;
+  const ent = entradas(ini, fim), ctlCal = controleEntre(ini, fim);
+  let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent.concat(ctlCal), '52px')}"><div class="hd"></div>`;
   for (let i = 0; i < 7; i++) { const dd = addDays(ini, i); g += `<div class="hd ${ymd(dd) === hs ? 'hoje' : ''}">${DIAS[dd.getDay()]} ${dd.getDate()}</div>`; }
   g += `<div class="ad" style="border-left:0;font-size:10px;color:var(--muted);padding-top:6px;text-align:right">dia todo</div>`;
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i));
-    g += `<div class="ad">${ent.filter(x => x.data === d && !x.hora).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${esc(x.titulo)}</div>`).join('')}</div>`;
+    const cd = ctlCal.filter(x => x.data === d), porP = {}; cd.forEach(x => { (porP[x.p.id] = porP[x.p.id] || []).push(x); });
+    const chipsCtl = Object.values(porP).map(l => { const pend = l.filter(x => !x.feito).length; return `<div class="adchip" style="background:#fff;color:${corCtl(l[0].p)};border:1px dashed ${corCtl(l[0].p)};${pend ? '' : 'opacity:.45'}" data-selproj="${l[0].p.id}" title="${esc(l.map(x => (x.feito ? '✓ ' : '• ') + x.titulo).join('\n'))}">📋 ${esc(l[0].p.nome)} (${pend || '✓'})</div>`; }).join('');
+    g += `<div class="ad">${chipsCtl}${ent.filter(x => x.data === d && !x.hora).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${esc(x.titulo)}</div>`).join('')}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
@@ -1087,11 +1093,22 @@ function vProjetos() {
     const p = projeto(selProj.id);
     if (!p) { selProj = null; return vProjetos(); }
     const a = area(p.areaId);
-    det = `<div class="card"><div style="display:flex;align-items:center;gap:10px"><span class="sw" style="background:${a ? a.cor : '#999'};width:16px;height:16px"></span><div style="flex:1"><h2 style="margin:0;font-size:20px">${esc(p.nome)}</h2><div class="hint">${esc(a ? a.nome : '')} · ${p.tipo === 'obra' ? 'Obra' : 'Projeto'}</div></div><button class="btn sm pri" data-demanda-proj="${p.id}">+ Demanda</button> <button class="btn sm" data-editproj="${p.id}">Editar</button></div>
+    det = `<div class="card"><div style="display:flex;align-items:center;gap:10px"><span class="sw" style="background:${a ? a.cor : '#999'};width:16px;height:16px"></span><div style="flex:1"><h2 style="margin:0;font-size:20px">${esc(p.nome)}</h2><div class="hint">${esc(a ? a.nome : '')} · ${p.tipo === 'obra' ? 'Obra' : 'Projeto'}${CATEGORIAS[p.categoria] ? ' · ' + CATEGORIAS[p.categoria].nome : ''}${p.local ? ' · ' + esc(p.local) : ''}</div></div><button class="btn sm pri" data-demanda-proj="${p.id}">+ Demanda</button> <button class="btn sm" data-editproj="${p.id}">Editar</button></div>
       ${p.descricao ? `<p style="margin:10px 0 0;white-space:pre-wrap">${esc(p.descricao)}</p>` : ''}</div>
+      ${cardControle(p)}
       ${secoesItens(D.itens.filter(i => i.projetoId === p.id), { areaId: p.areaId, projetoId: p.id })}`;
   }
   return `<div class="proj-wrap">${lista}<div>${det}</div></div>`;
+}
+function cardControle(p) {
+  const cat = CATEGORIAS[p.categoria];
+  if (!cat || !(cat.semanal || cat.dia20)) return cat ? '' : `<div class="card"><div class="hint">Defina uma <b>categoria de controle</b> (Editar) para gerar as pendências automáticas desta obra.</div></div>`;
+  const h = hoje0(), pend = tarefasControle(p, parseYmd(p.controleDesde || ymd(segundaDe(h))), addDays(h, -1)).filter(x => !x.feito);
+  const prox = tarefasControle(p, h, addDays(h, cat.semanal ? 13 : 40));
+  const c = ctxFer(p);
+  return `<div class="card"><div class="sec-h"><h3 style="margin:0">Controle · ${esc(cat.nome)}</h3><span class="hint">${esc([p.local, c.uf].filter(Boolean).join(' / '))}</span></div>
+    ${pend.length ? `<div class="hint" style="margin:6px 0 2px;font-weight:600;color:var(--warn)">Pendentes</div>${pend.map(x => linhaCtl(x)).join('')}` : ''}
+    <div class="hint" style="margin:8px 0 2px;font-weight:600">Próximas</div>${prox.map(x => linhaCtl(x)).join('') || '<div class="empty">Nada nos próximos dias.</div>'}</div>`;
 }
 function secoesItens(itens, ctx) {
   const ctxA = esc(JSON.stringify(ctx));
@@ -1144,6 +1161,15 @@ function vConfig() {
       <label class="cb"><input type="checkbox" id="cfgNotif" ${c.notificacoes ? 'checked' : ''}> Notificações do Windows para itens que não estão no Outlook</label>
       <p class="hint">Itens gravados no Outlook avisam pelo próprio Outlook (computador e celular). Os outros avisam por aqui, enquanto o sistema estiver aberto.</p>
       <button class="btn sm" data-acao="testarNotif">Testar notificação</button></div>
+    <div class="card"><h3>Feriados</h3>
+      <div class="fr"><div class="f" style="max-width:120px"><label>Estado padrão</label><select id="cfgUF">${UFS.map(u => `<option ${(D.config.ufPadrao || 'RJ') === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div>
+        <div class="f"><label>Ver lista de</label><select id="cfgUFver">${UFS.map(u => `<option ${(vConfig._ufVer || D.config.ufPadrao || 'RJ') === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div>
+      <label class="cb"><input type="checkbox" id="cfgCarnaval" ${cfgFer().carnaval ? 'checked' : ''}> Carnaval (segunda e terça) não é dia útil</label>
+      <label class="cb"><input type="checkbox" id="cfgCorpus" ${cfgFer().corpus ? 'checked' : ''}> Corpus Christi não é dia útil</label>
+      ${(() => { const uf = vConfig._ufVer || D.config.ufPadrao || 'RJ', ano = new Date().getFullYear(); const l = [...listaFeriados(ano, uf, []).entries()].sort(); return `<div class="hint" style="margin:6px 0">${uf} · ${ano}: ${l.map(([d, n]) => `${d.slice(8, 10)}/${d.slice(5, 7)} ${esc(n)}`).join(' · ')}</div>`; })()}
+      <div class="f"><label>Ajustes do estado ${esc(vConfig._ufVer || D.config.ufPadrao || 'RJ')} (um por linha: <code>+MM-DD Nome</code> para acrescentar, <code>-MM-DD</code> para remover)</label><textarea id="cfgFerAj" style="min-height:60px">${esc([...(cfgFer().extras[vConfig._ufVer || D.config.ufPadrao || 'RJ'] || []).map(x => '+' + x), ...(cfgFer().removidos[vConfig._ufVer || D.config.ufPadrao || 'RJ'] || []).map(x => '-' + x)].join('\n'))}</textarea></div>
+      <button class="btn sm" data-acao="salvarFer">Salvar ajustes</button>
+      <p class="hint">Feriados municipais ficam no cadastro de cada obra.</p></div>
     <div class="card"><h3>Cópia de segurança</h3><p class="hint">Os dados ficam no seu OneDrive, em <b>Apps / MeusAfazeres / dados.json</b>, com uma cópia por dia na pasta <b>backups</b>.</p></div>
   </div></div>`;
 }
@@ -1331,6 +1357,13 @@ function modalProj(p) {
     <div class="f"><label>Nome</label><input id="pNome" value="${esc(p.nome)}" placeholder="Ex.: Obra Residencial Jardins"></div>
     <div class="fr"><div class="f"><label>Empresa / área</label><select id="pArea">${D.areas.map(a => `<option value="${a.id}" ${a.id === p.areaId ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></div>
       <div class="f"><label>Tipo</label><select id="pTipo"><option value="obra" ${p.tipo === 'obra' ? 'selected' : ''}>Obra</option><option value="projeto" ${p.tipo === 'projeto' ? 'selected' : ''}>Projeto</option></select></div></div>
+    <div class="box"><div class="fr"><div class="f"><label>Categoria de controle</label><select id="pCat"><option value="">— nenhuma —</option>${Object.entries(CATEGORIAS).map(([k, c]) => `<option value="${k}" ${p.categoria === k ? 'selected' : ''}>${c.nome}</option>`).join('')}</select></div>
+      <div class="f"><label>Local (cidade)</label><input id="pLocal" value="${esc(p.local || '')}" placeholder="Ex.: Niterói"></div>
+      <div class="f" style="max-width:110px"><label>Estado</label><select id="pUF">${UFS.map(u => `<option ${(p.uf || D.config.ufPadrao || 'RJ') === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div>
+      <div class="f"><label>Feriados municipais (dia/mês, separados por vírgula)</label><input id="pFerLoc" value="${esc(p.feriadosLocais || '')}" placeholder="Ex.: 20/01, 24/06"></div>
+      <div class="fr"><div class="f"><label>Agenda das reuniões</label><select id="pAgenda"><option value="">Automática</option>${todosCals().filter(k => k.podeEditar).map(k => { const v = k.padrao ? '@principal' : k.id; return `<option value="${esc(v)}" ${p.agendaId === v ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}</option>`; }).join('')}</select></div>
+        <div class="f" style="flex:2"><label>Participantes padrão das reuniões</label><input id="pPart" value="${esc(p.participantes || '')}" placeholder="e-mails separados por vírgula"></div></div>
+      <div class="hint">A categoria gera as pendências automáticas desta obra (agendar reunião, relatórios, tarefas mensais), contando dias úteis com os feriados nacionais, do estado e os municipais acima.</div></div>
     <div class="f"><label>Descrição / observações</label><textarea id="pDesc">${esc(p.descricao)}</textarea></div>
     <div class="acts">${novo ? '' : `<button class="btn dan l" data-acao="excluirProj">Excluir</button>`}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarProj">Salvar</button></div>`);
   modalProj._p = p; modalProj._novo = novo;
@@ -1349,6 +1382,11 @@ document.addEventListener('click', async ev => {
   const t = ev.target;
   if (suprimirClique) { suprimirClique = false; ev.stopPropagation(); return; }
   const mv = t.closest('[data-mover]'); if (mv) return confirmarMover(mv.dataset.mover);
+  const ctlc = t.closest('[data-ctl]');
+  if (ctlc) { const [pid, pkey, tkey] = ctlc.dataset.ctl.split('|'); if (tkey === 'agendar' && ctlc.checked) { ctlc.checked = false; return modalAgendar(pid, pkey); } return marcarCtl(pid, pkey, tkey, ctlc.checked); }
+  const ag = t.closest('[data-agendar]'); if (ag) { ev.stopPropagation(); const [pid, pkey] = ag.dataset.agendar.split('|'); return modalAgendar(pid, pkey); }
+  const agc = t.closest('[data-agendar-criar]'); if (agc) { const [pid, pkey] = agc.dataset.agendarCriar.split('|'); return agendarCriar(pid, pkey); }
+  const agf = t.closest('[data-agendar-fora]'); if (agf) { const [pid, pkey] = agf.dataset.agendarFora.split('|'); return agendarFora(pid, pkey); }
   const cp = t.closest('[data-copiar]'); if (cp) { ev.preventDefault(); return copiarTexto(cp.dataset.copiar, 'Link copiado.'); }
   const cv = t.closest('[data-convite]'); if (cv) { ev.preventDefault(); const it = D.itens.find(i => i.id === cv.dataset.convite); return copiarTexto(textoConvite(it.titulo, it.data, it.hora, it.duracao, it.linkReuniao), 'Convite copiado.'); }
   const ce = t.closest('[data-convite-ev]'); if (ce) { const e = modalEvento._e, sd = e.start.dateTime.slice(0, 10); return copiarTexto(textoConvite(e.subject, sd, e.isAllDay ? '' : e.start.dateTime.slice(11, 16), hm2min(e.end.dateTime.slice(11, 16)) - hm2min(e.start.dateTime.slice(11, 16)), e.onlineMeeting.joinUrl), 'Convite copiado.'); }
@@ -1400,6 +1438,7 @@ document.addEventListener('click', async ev => {
     case 'gEntrar': return gEntrar(!gCfg().ativo);
     case 'gSair': return gSair();
     case 'gDiag': return gDiagnostico();
+    case 'salvarFer': { const uf = vConfig._ufVer || D.config.ufPadrao || 'RJ', cf = cfgFer(); const ls = $('#cfgFerAj').value.split('\n').map(x => x.trim()).filter(Boolean); cf.extras[uf] = ls.filter(x => x[0] === '+').map(x => x.slice(1).trim()); cf.removidos[uf] = ls.filter(x => x[0] === '-').map(x => x.slice(1).trim()); cacheFer.clear(); salvar(); toast('Feriados salvos.'); return render(); }
     case 'salvarDemanda': return salvarDemanda();
     case 'excluirDemanda': return excluirDemanda();
     case 'addReuniaoOnline': return adicionarReuniaoOnline();
@@ -1430,6 +1469,8 @@ document.addEventListener('click', async ev => {
     }
     case 'salvarProj': {
       const p = modalProj._p; p.nome = $('#pNome').value.trim(); p.areaId = $('#pArea').value; p.tipo = $('#pTipo').value; p.descricao = $('#pDesc').value;
+      const catNova = $('#pCat').value; if (catNova && catNova !== p.categoria) p.controleDesde = ymd(segundaDe(hoje0()));
+      Object.assign(p, { categoria: catNova, local: $('#pLocal').value.trim(), uf: $('#pUF').value, feriadosLocais: $('#pFerLoc').value.trim(), agendaId: $('#pAgenda').value, participantes: $('#pPart').value.trim() });
       if (!p.nome) return toast('Dê um nome ao projeto.', true);
       if (modalProj._novo) D.projetos.push(p);
       D.itens.filter(i => i.projetoId === p.id).forEach(i => i.areaId = p.areaId);
@@ -1456,6 +1497,10 @@ document.addEventListener('change', ev => {
   }
   if (t.matches('[data-areacal]')) { area(t.dataset.areacal).calendarioId = t.value; salvar(); return; }
   if (t.id === 'cfgCalPad') { D.config.calendarioPadrao = t.value; salvar(); }
+  if (t.id === 'cfgUF') { D.config.ufPadrao = t.value; cacheFer.clear(); salvar(); return render(); }
+  if (t.id === 'cfgUFver') { vConfig._ufVer = t.value; return render(); }
+  if (t.id === 'cfgCarnaval') { cfgFer().carnaval = t.checked; cacheFer.clear(); salvar(); return render(); }
+  if (t.id === 'cfgCorpus') { cfgFer().corpus = t.checked; cacheFer.clear(); salvar(); return render(); }
   if (t.id === 'cfgLemb') { D.config.lembretePadrao = Math.max(0, +t.value || 0); salvar(); }
   if (t.id === 'cfgNotif') { D.config.notificacoes = t.checked; salvar(); if (t.checked) pedirNotif(); }
 });
@@ -1521,6 +1566,193 @@ async function vincularEvento() {
     D.itens.push(it); salvar(); fecharModal(); faixaEventos = ''; render();
     toast(`Vinculado a ${p.nome}.`);
   } catch (er) { toast('Não consegui vincular: ' + er.message, true); }
+}
+
+/* ================= feriados e dias úteis ================= */
+const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
+const FER_NAC = { '01-01': 'Confraternização Universal', '04-21': 'Tiradentes', '05-01': 'Dia do Trabalho', '09-07': 'Independência', '10-12': 'Nossa Senhora Aparecida', '11-02': 'Finados', '11-15': 'Proclamação da República', '11-20': 'Consciência Negra', '12-25': 'Natal' };
+// feriados estaduais (revise em Configurações → Feriados; dá para acrescentar ou remover datas)
+const FER_UF = {
+  AC: { '01-23': 'Dia do Evangélico', '06-15': 'Aniversário do Acre', '08-06': 'Revolução Acreana', '09-05': 'Dia da Amazônia', '11-17': 'Tratado de Petrópolis' },
+  AL: { '06-24': 'São João', '06-29': 'São Pedro', '09-16': 'Emancipação de Alagoas', '11-30': 'Dia do Evangélico' },
+  AP: { '03-19': 'São José', '09-13': 'Criação do Território' }, AM: { '09-05': 'Elevação do Amazonas a Província' },
+  BA: { '07-02': 'Independência da Bahia' }, CE: { '03-19': 'São José', '03-25': 'Data Magna do Ceará' }, DF: { '11-30': 'Dia do Evangélico' },
+  ES: {}, GO: {}, MA: { '07-28': 'Adesão do Maranhão' }, MT: {}, MS: { '10-11': 'Criação do Estado' }, MG: {},
+  PA: { '08-15': 'Adesão do Pará' }, PB: { '08-05': 'Fundação da Paraíba' }, PR: { '12-19': 'Emancipação do Paraná' }, PE: { '03-06': 'Revolução Pernambucana' },
+  PI: { '10-19': 'Dia do Piauí' }, RJ: { '04-23': 'São Jorge', 'carnaval-ter': 'Carnaval' }, RN: { '10-03': 'Mártires de Cunhaú e Uruaçu' },
+  RS: { '09-20': 'Revolução Farroupilha' }, RO: { '01-04': 'Criação do Estado', '06-18': 'Dia do Evangélico' }, RR: { '10-05': 'Criação do Estado' },
+  SC: {}, SP: { '07-09': 'Revolução Constitucionalista' }, SE: { '07-08': 'Emancipação de Sergipe' }, TO: { '03-18': 'Autonomia do Tocantins', '09-08': 'Nossa Senhora da Natividade', '10-05': 'Criação do Estado' }
+};
+function pascoa(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(y, mes - 1, dia);
+}
+const cacheFer = new Map();
+function cfgFer() { if (!D.config.feriados) D.config.feriados = { carnaval: true, corpus: true, extras: {}, removidos: {} }; return D.config.feriados; }
+function listaFeriados(ano, uf, locais) {
+  const cf = cfgFer(), key = [ano, uf, (locais || []).join(','), cf.carnaval, cf.corpus, JSON.stringify(cf.extras[uf] || []), JSON.stringify(cf.removidos[uf] || [])].join('|');
+  if (cacheFer.has(key)) return cacheFer.get(key);
+  const m = new Map(), p = pascoa(ano), mov = n => ymd(addDays(p, n));
+  Object.entries(FER_NAC).forEach(([md, n]) => m.set(`${ano}-${md}`, n));
+  m.set(mov(-2), 'Sexta-feira Santa');
+  if (cf.carnaval) { m.set(mov(-48), 'Carnaval'); m.set(mov(-47), 'Carnaval'); }
+  if (cf.corpus) m.set(mov(60), 'Corpus Christi');
+  Object.entries(FER_UF[uf] || {}).forEach(([md, n]) => m.set(md === 'carnaval-ter' ? mov(-47) : `${ano}-${md}`, n + ` (${uf})`));
+  (cf.extras[uf] || []).forEach(x => { const [d, ...n] = x.split(' '); if (d.length === 5) m.set(`${ano}-${d}`, n.join(' ') || 'Feriado'); else if (d.startsWith(String(ano))) m.set(d, n.join(' ') || 'Feriado'); });
+  (locais || []).forEach(md => m.set(`${ano}-${md}`, 'Feriado municipal'));
+  (cf.removidos[uf] || []).forEach(d => { if (d.length === 5) m.delete(`${ano}-${d}`); else m.delete(d); });
+  cacheFer.set(key, m);
+  return m;
+}
+function ctxFer(p) {
+  const locais = String((p && p.feriadosLocais) || '').split(/[,;\s]+/).map(x => { const k = x.match(/^(\d{1,2})\/(\d{1,2})$/); return k ? `${pad(k[2])}-${pad(k[1])}` : ''; }).filter(Boolean);
+  return { uf: (p && p.uf) || D.config.ufPadrao || 'RJ', locais };
+}
+function ehUtil(d, c) { const w = d.getDay(); if (w === 0 || w === 6) return false; return !listaFeriados(d.getFullYear(), c.uf, c.locais).has(ymd(d)); }
+function anteriorUtil(d, c) { let x = addDays(d, -1); for (let i = 0; i < 20 && !ehUtil(x, c); i++) x = addDays(x, -1); return x; }
+function somarUteis(d, n, c) { let x = d, k = 0; for (let i = 0; i < 40 && k < n; i++) { x = addDays(x, 1); if (ehUtil(x, c)) k++; } return x; }
+function primeiroUtilSemana(seg, c) { for (let i = 0; i < 5; i++) { const d = addDays(seg, i); if (ehUtil(d, c)) return d; } return seg; }
+function ultimoUtilSemana(seg, c) { for (let i = 4; i >= 0; i--) { const d = addDays(seg, i); if (ehUtil(d, c)) return d; } return addDays(seg, 4); }
+const segundaDe = d => addDays(d, -((d.getDay() + 6) % 7));
+const mesDaSemana = seg => { const q = addDays(seg, 2); return `${q.getFullYear()}-${pad(q.getMonth() + 1)}`; };
+const ultimaSemanaDoMes = seg => mesDaSemana(seg) !== mesDaSemana(addDays(seg, 7));
+const nomeMes = ym => { const [y, m] = ym.split('-').map(Number); return `${MESES[m - 1]}/${y}`; };
+
+/* ================= categorias de controle ================= */
+const TAREFAS_SIENGE = ['Reprogramar o Project', 'Enviar a medição para o Sienge', 'Ajustar a data de medição no Sienge', 'Enviar o Project para o sistema R. Nunes', 'Baixar a medição do Sienge no sistema R. Nunes', 'Fazer o fechamento mensal'];
+const CATEGORIAS = {
+  sienge_semanal: { nome: 'Sienge Semanal', semanal: true },
+  sienge_mensal: { nome: 'Sienge Mensal', dia20: true },
+  project_mensal: { nome: 'Project Mensal', dia20: true },
+  pessoal: { nome: 'Pessoal' }
+};
+function ctlRec(pid, pkey) {
+  if (!D.controle) D.controle = {};
+  if (!D.controle[pid]) D.controle[pid] = {};
+  if (!D.controle[pid][pkey]) D.controle[pid][pkey] = { feitos: {} };
+  return D.controle[pid][pkey];
+}
+function ctlPeek(pid, pkey) { return (D.controle && D.controle[pid] && D.controle[pid][pkey]) || { feitos: {} }; }
+function dataReuniao(pid, pkey) {
+  const r = ctlPeek(pid, pkey);
+  if (r.reuniaoItem) { const it = D.itens.find(i => i.id === r.reuniaoItem); if (it && it.data) return { data: it.data, hora: it.hora, it }; }
+  if (r.reuniaoData) return { data: r.reuniaoData, hora: r.reuniaoHora || '' };
+  return null;
+}
+// gera as tarefas de controle de um projeto com vencimento entre ini e fim
+function tarefasControle(p, ini, fim) {
+  const cat = CATEGORIAS[p.categoria]; if (!cat || !(cat.semanal || cat.dia20)) return [];
+  const c = ctxFer(p), desde = parseYmd(p.controleDesde || ymd(segundaDe(hoje0())));
+  const out = [];
+  const add = (pkey, tkey, titulo, data, extra) => {
+    const r = ctlPeek(p.id, pkey);
+    out.push(Object.assign({ k: 'ctl', p, pkey, tkey, titulo, data: ymd(data), feito: !!r.feitos[tkey] }, extra || {}));
+  };
+  if (cat.semanal) {
+    for (let seg = segundaDe(addDays(ini, -6) > desde ? addDays(ini, -6) : desde); seg <= fim; seg = addDays(seg, 7)) {
+      if (addDays(seg, 6) < desde) continue;
+      const pkey = 'S:' + ymd(seg), r = ctlPeek(p.id, pkey), reu = dataReuniao(p.id, pkey);
+      const dReu = reu ? parseYmd(reu.data) : ultimoUtilSemana(seg, c), d1 = primeiroUtilSemana(seg, c);
+      add(pkey, 'agendar', 'Agendar a reunião semanal', d1, { acao: 'agendar', feito: !!reu || !!r.feitos.agendar, reuniao: reu, sugestao: ymd(ultimoUtilSemana(seg, c)), periodo: 'semana de ' + fmtData(ymd(seg)) });
+      add(pkey, 'atualizar', `Pedir atualização do sistema R. Nunes (até ${fmtData(ymd(anteriorUtil(dReu, c)))})`, d1);
+      add(pkey, 'relatorios', 'Fechar os relatórios semanais', dReu);
+      if (ultimaSemanaDoMes(seg)) TAREFAS_SIENGE.forEach((t, i) => add(pkey, 'm' + i, t, dReu, { mensal: nomeMes(mesDaSemana(seg)) }));
+    }
+  }
+  if (cat.dia20) {
+    const m0 = new Date(Math.max(desde, new Date(ini.getFullYear(), ini.getMonth() - 1, 1))), mFim = new Date(fim.getFullYear(), fim.getMonth(), 1);
+    for (let m = new Date(m0.getFullYear(), m0.getMonth(), 1); m <= mFim; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+      const ym = `${m.getFullYear()}-${pad(m.getMonth() + 1)}`, pkey = 'M:' + ym, r = ctlPeek(p.id, pkey), reu = dataReuniao(p.id, pkey);
+      const d20 = new Date(m.getFullYear(), m.getMonth(), 20);
+      if (d20 < desde && !reu) continue;
+      add(pkey, 'agendar', `Agendar a reunião mensal (${nomeMes(ym)})`, d20, { acao: 'agendar', feito: !!reu || !!r.feitos.agendar, reuniao: reu, alerta: true, periodo: nomeMes(ym) });
+      if (reu) {
+        const dReu = parseYmd(reu.data);
+        if (p.categoria === 'sienge_mensal') {
+          TAREFAS_SIENGE.forEach((t, i) => add(pkey, 'm' + i, t, dReu, { mensal: nomeMes(ym) }));
+          add(pkey, 'relatorios', 'Fechar os relatórios', dReu, { mensal: nomeMes(ym) });
+        } else {
+          add(pkey, 'm0', 'Reprogramar o Project', dReu, { mensal: nomeMes(ym) });
+          add(pkey, 'relatorios', 'Enviar os relatórios mensais', somarUteis(dReu, 2, c), { mensal: nomeMes(ym) });
+        }
+      }
+    }
+  }
+  return out.filter(x => { const d = parseYmd(x.data); return d >= ini && d <= fim; });
+}
+function controleEntre(ini, fim) {
+  return D.projetos.filter(p => CATEGORIAS[p.categoria]).flatMap(p => tarefasControle(p, ini, fim))
+    .sort((a, b) => a.data.localeCompare(b.data) || a.p.nome.localeCompare(b.p.nome));
+}
+// pendências até hoje (atrasadas + de hoje + alertas do dia 20 ativos)
+function pendenciasControle() {
+  const h = hoje0();
+  return D.projetos.filter(p => CATEGORIAS[p.categoria]).flatMap(p => tarefasControle(p, parseYmd(p.controleDesde || ymd(segundaDe(h))), h)).filter(x => !x.feito);
+}
+function linhaCtl(x, opts = {}) {
+  const hs = ymd(hoje0()), late = x.data < hs, cor = corCtl(x.p);
+  const quando = x.alerta ? `desde ${fmtData(x.data)}` : fmtData(x.data);
+  const reu = x.reuniao ? ` · reunião ${fmtData(x.reuniao.data)}${x.reuniao.hora ? ' ' + x.reuniao.hora : ''}` : '';
+  return `<div class="row ${x.feito ? 'done' : ''}"><input type="checkbox" class="chk" data-ctl="${x.p.id}|${x.pkey}|${x.tkey}" ${x.feito ? 'checked' : ''}><div class="bar" style="background:${cor}"></div>
+    <div class="time">${opts.semData ? '' : quando}</div>
+    <div class="txt" data-selproj="${x.p.id}"><div class="t">${esc(x.titulo)}${late && !x.feito ? `<span class="tag ${x.alerta ? 'late' : 'late'}">${x.alerta ? 'pendente' : 'atrasado'}</span>` : ''}${x.mensal ? `<span class="tag">mensal ${esc(x.mensal)}</span>` : ''}</div>
+    <div class="s">${esc(x.p.nome)} · ${esc(CATEGORIAS[x.p.categoria].nome)}${esc(reu)}</div></div>
+    ${x.acao === 'agendar' && !x.feito ? `<button class="btn sm pri" data-agendar="${x.p.id}|${x.pkey}">Agendar</button>` : ''}</div>`;
+}
+function corCtl(p) { const a = area(p.areaId); return corDoCal(p.agendaId || (a && a.calendarioId) || '') || (a && a.cor) || '#64748b'; }
+
+/* agendar reunião de controle */
+function modalAgendar(pid, pkey) {
+  const p = projeto(pid), c = ctxFer(p), sem = pkey.startsWith('S:');
+  let sug;
+  if (sem) sug = ymd(ultimoUtilSemana(parseYmd(pkey.slice(2)), c));
+  else { const [y, m] = pkey.slice(2).split('-').map(Number); let d = new Date(y, m - 1, 25); while (!ehUtil(d, c)) d = addDays(d, 1); sug = ymd(d < hoje0() ? hoje0() : d); }
+  const reu = dataReuniao(pid, pkey);
+  const cals = todosCals().filter(k => k.podeEditar), calSel = p.agendaId || calPadraoProjeto(pid);
+  const optsCal = (cals.some(k => k.padrao) ? '' : `<option value="@principal">Outlook · Calendário principal</option>`) +
+    cals.map(k => { const v = k.padrao ? '@principal' : k.id; return `<option value="${esc(v)}" ${calSel === v ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}</option>`; }).join('');
+  abrirModal(`<h3>Agendar reunião ${sem ? 'semanal' : 'mensal'} — ${esc(p.nome)}</h3>
+    <p class="hint">${sem ? 'Semana de ' + fmtData(pkey.slice(2)) + '. Sugestão: último dia útil da semana.' : 'Referente a ' + nomeMes(pkey.slice(2)) + '.'}${reu ? ` Já registrada para ${fmtData(reu.data)}.` : ''}</p>
+    <div class="f"><label>Título</label><input id="aTit" value="${esc(`Reunião ${sem ? 'semanal' : 'mensal'}`)}"><span class="hint">O nome da obra é acrescentado automaticamente no evento.</span></div>
+    <div class="fr"><div class="f"><label>Data</label><input type="date" id="aData" value="${reu ? reu.data : sug}"></div><div class="f"><label>Hora</label><input type="time" id="aHora" value="${(reu && reu.hora) || p.horaReuniao || '09:00'}"></div><div class="f"><label>Duração (min)</label><input type="number" id="aDur" min="15" step="15" value="${p.duracaoReuniao || 60}"></div></div>
+    <div class="f"><label>Agenda</label><select id="aCal">${optsCal}</select></div>
+    <div class="f"><label>Participantes (e-mails separados por vírgula)</label><input id="aPart" value="${esc(p.participantes || '')}"></div>
+    <label class="cb"><input type="checkbox" id="aLink" ${p.linkOnline !== false ? 'checked' : ''}> Criar link de reunião online (Meet / Teams)</label>
+    <p class="hint" id="aAviso"></p>
+    <div class="acts"><button class="btn l" data-agendar-fora="${pid}|${pkey}" title="Só registra a data; não cria evento">Já agendei por fora</button><button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-agendar-criar="${pid}|${pkey}">Criar reunião na agenda</button></div>`);
+  const av = () => { const d = $('#aData').value; $('#aAviso').textContent = d && !ehUtil(parseYmd(d), c) ? '⚠ Essa data não é dia útil para esta obra (' + c.uf + ').' : ''; };
+  $('#aData').addEventListener('change', av); av();
+}
+async function agendarCriar(pid, pkey) {
+  const p = projeto(pid), d = $('#aData').value; if (!d) return toast('Escolha a data.', true);
+  const r = ctlRec(pid, pkey);
+  Object.assign(p, { agendaId: $('#aCal').value, participantes: $('#aPart').value.trim(), horaReuniao: $('#aHora').value, duracaoReuniao: +$('#aDur').value || 60, linkOnline: $('#aLink').checked });
+  let it = r.reuniaoItem ? D.itens.find(i => i.id === r.reuniaoItem) : null;
+  if (!it) { it = novoItemBase({ tipo: 'reuniao', controle: pid + '|' + pkey }); D.itens.push(it); r.reuniaoItem = it.id; }
+  Object.assign(it, { titulo: $('#aTit').value.trim() || 'Reunião', projetoId: pid, areaId: p.areaId, data: d, hora: $('#aHora').value, duracao: +$('#aDur').value || 60, calendarioId: $('#aCal').value, participantes: p.participantes, teams: p.linkOnline, sincronizar: true, _pend: true });
+  delete r.reuniaoData;
+  fecharModal(); salvar(); render();
+  await sincronizar(it); salvar(); faixaEventos = ''; render();
+  if (!it.erroSync) toast('Reunião criada na agenda' + (it.linkReuniao ? ' com link.' : '.'));
+}
+function agendarFora(pid, pkey) {
+  const d = $('#aData').value; if (!d) return toast('Escolha a data.', true);
+  const r = ctlRec(pid, pkey); r.reuniaoData = d; r.reuniaoHora = $('#aHora').value; r.feitos.agendar = true;
+  fecharModal(); salvar(); render(); toast('Data da reunião registrada.');
+}
+function marcarCtl(pid, pkey, tkey, v) {
+  const r = ctlRec(pid, pkey);
+  if (v) r.feitos[tkey] = true; else delete r.feitos[tkey];
+  salvar(); setTimeout(render, 120);
+}
+function garantirPessoal() {
+  if (D.projetos.some(p => p.categoria === 'pessoal')) return;
+  let a = D.areas.find(a => /pessoal/i.test(a.nome));
+  if (!a) { a = { id: uid(), nome: 'Pessoal', cor: '#ea580c', calendarioId: '' }; D.areas.push(a); }
+  D.projetos.unshift({ id: uid(), areaId: a.id, nome: 'Pessoal', tipo: 'projeto', descricao: '', categoria: 'pessoal', uf: 'RJ' });
+  salvar();
 }
 
 /* ================= demandas rápidas ================= */
@@ -1888,6 +2120,11 @@ function verificarLembretes() {
   if (!D.config.notificacoes) return;
   const n = new Date(), hs = ymd(n), agora = n.getHours() * 60 + n.getMinutes();
   const agoraTxt = `${hs}T${min2hm(agora)}`;
+  if (agora >= 8 * 60 && D.config.ultimoResumoCtl !== hs) {
+    const pc = pendenciasControle();
+    D.config.ultimoResumoCtl = hs; salvar();
+    if (pc.length) notificar(`${pc.length} pendência(s) de controle`, [...new Set(pc.map(x => x.p.nome))].slice(0, 4).join(', '));
+  }
   D.itens.forEach(it => {
     if (!it.demanda || !it.lembrarEm || it.concluidas[it.data] || avisados.has('d' + it.id + it.lembrarEm)) return;
     if (agoraTxt >= it.lembrarEm && agoraTxt.slice(0, 10) === it.lembrarEm.slice(0, 10)) {
@@ -1924,6 +2161,7 @@ function telaLogin(msg) {
   try { await carregar(); }
   catch (e) { return telaLogin('Não consegui ler seus dados no OneDrive: ' + e.message); }
   document.body.classList.remove('login');
+  garantirPessoal();
   gRestaurar();
   render();
   if (gOk()) gCarregarCalendarios().then(() => { faixaEventos = ''; render(); }).catch(e => { erroGoogle = e.message; });
