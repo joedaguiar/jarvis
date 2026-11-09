@@ -144,7 +144,7 @@ body.arrastando,body.arrastando *{user-select:none!important}
 .toast{background:#1d2330;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:380px;font-size:13.5px}
 .toast.err{background:var(--danger)}
 table.cfg{border-collapse:collapse;width:100%}
-body.login #nav,body.login #btnNovo,body.login #btnReuniao{display:none}
+body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemanda{display:none}
 @media (max-width:820px){
   body{flex-direction:column}
   #side{width:auto;order:2;flex-direction:row;padding:4px 6px;border-top:1px solid #2b3346}
@@ -185,6 +185,7 @@ table.cfg td{padding:6px 4px;border-bottom:1px solid #f0f1f4;vertical-align:midd
   <div id="top">
     <h2 id="titulo">Hoje</h2>
     <div id="filtros"></div>
+    <button class="btn" id="btnDemanda">+ Demanda</button>
     <button class="btn" id="btnReuniao">+ Reunião</button>
     <button class="btn pri" id="btnNovo">+ Novo</button>
   </div>
@@ -1086,7 +1087,7 @@ function vProjetos() {
     const p = projeto(selProj.id);
     if (!p) { selProj = null; return vProjetos(); }
     const a = area(p.areaId);
-    det = `<div class="card"><div style="display:flex;align-items:center;gap:10px"><span class="sw" style="background:${a ? a.cor : '#999'};width:16px;height:16px"></span><div style="flex:1"><h2 style="margin:0;font-size:20px">${esc(p.nome)}</h2><div class="hint">${esc(a ? a.nome : '')} · ${p.tipo === 'obra' ? 'Obra' : 'Projeto'}</div></div><button class="btn sm" data-editproj="${p.id}">Editar</button></div>
+    det = `<div class="card"><div style="display:flex;align-items:center;gap:10px"><span class="sw" style="background:${a ? a.cor : '#999'};width:16px;height:16px"></span><div style="flex:1"><h2 style="margin:0;font-size:20px">${esc(p.nome)}</h2><div class="hint">${esc(a ? a.nome : '')} · ${p.tipo === 'obra' ? 'Obra' : 'Projeto'}</div></div><button class="btn sm pri" data-demanda-proj="${p.id}">+ Demanda</button> <button class="btn sm" data-editproj="${p.id}">Editar</button></div>
       ${p.descricao ? `<p style="margin:10px 0 0;white-space:pre-wrap">${esc(p.descricao)}</p>` : ''}</div>
       ${secoesItens(D.itens.filter(i => i.projetoId === p.id), { areaId: p.areaId, projetoId: p.id })}`;
   }
@@ -1095,8 +1096,8 @@ function vProjetos() {
 function secoesItens(itens, ctx) {
   const ctxA = esc(JSON.stringify(ctx));
   const sec = (tipo, titulo, vazio) => {
-    const l = itens.filter(i => i.tipo === tipo);
-    return `<div class="card"><div class="sec-h"><h3 style="margin:0">${titulo}</h3><button class="btn sm" data-novo-tipo="${tipo}" data-ctx="${ctxA}">+ ${TIPOS[tipo]}</button></div>
+    const l = itens.filter(i => i.tipo === tipo && !i.avisoDe);
+    return `<div class="card"><div class="sec-h"><h3 style="margin:0">${titulo}</h3>${tipo === 'entrega' && ctx.projetoId ? `<button class="btn sm" data-demanda-proj="${ctx.projetoId}">+ Demanda</button>` : `<button class="btn sm" data-novo-tipo="${tipo}" data-ctx="${ctxA}">+ ${TIPOS[tipo]}</button>`}</div>
       ${l.length ? l.map(it => {
         const prox = proximaOcorrencia(it);
         const det = [it.recorrencia ? descRec(it.recorrencia) : (it.data ? fmtData(it.data) : 'Sem data'), it.hora ? it.hora : '', prox && it.recorrencia ? 'próxima: ' + fmtData(prox) : ''].filter(Boolean).join(' · ');
@@ -1105,7 +1106,7 @@ function secoesItens(itens, ctx) {
       }).join('') : `<div class="empty">${vazio}</div>`}</div>`;
   };
   return sec('rotina', 'Rotinas', 'Nenhuma rotina. Ex.: relatório semanal, medição mensal, reunião de obra.') +
-    sec('entrega', 'Entregas', 'Nenhuma entrega pontual.') + sec('reuniao', 'Reuniões', 'Nenhuma reunião.') + sec('tarefa', 'Tarefas', 'Nenhuma tarefa avulsa.');
+    sec('entrega', 'Entregas e demandas', 'Nenhuma entrega ou demanda.') + sec('reuniao', 'Reuniões', 'Nenhuma reunião.') + sec('tarefa', 'Tarefas', 'Nenhuma tarefa avulsa.');
 }
 
 function vConfig() {
@@ -1248,7 +1249,7 @@ async function salvarItemModal() {
     participantes: $('#iPart').value.trim(), local: $('#iLocal').value.trim(), teams: $('#iTeams').checked,
     calendarioId: $('#iCal').value, showAs: $('#iSA').value, lembrete: Math.max(0, +$('#iLemb').value || 0), notas: $('#iNotas').value
   });
-  it.sincronizar = !!it.data && !it.leitura;
+  it.sincronizar = !!it.data && !it.leitura && !it.demanda;
   if (it.sincronizar) it._pend = true;
   it.areaId = areaDoItem(it);
   D.config.ultimoCal = it.calendarioId;
@@ -1363,7 +1364,8 @@ document.addEventListener('click', async ev => {
   if (fi) return; // tratado no change
   if (filtroAberto && !t.closest('#filtroPop') && !t.closest('[data-acao=abrirFiltro]')) { filtroAberto = false; renderFiltros(); }
   const iEl = t.closest('[data-item]');
-  if (iEl) { ev.stopPropagation(); const it = D.itens.find(i => i.id === iEl.dataset.item); if (it) modalItem(it, false); return; }
+  if (iEl) { ev.stopPropagation(); const it = D.itens.find(i => i.id === iEl.dataset.item); if (it) (it.demanda ? modalDemanda(it) : it.avisoDe ? modalDemanda(D.itens.find(i => i.id === it.avisoDe) || it) : modalItem(it, false)); return; }
+  const dp = t.closest('[data-demanda-proj]'); if (dp) return modalDemanda(null, dp.dataset.demandaProj);
   const eEl = t.closest('[data-ev]');
   if (eEl) { ev.stopPropagation(); const e = eventos.find(x => x.id === eEl.dataset.ev); if (e) modalEvento(e); return; }
   const nd = t.closest('[data-novo-data]'); if (nd) return novoItem({ data: nd.dataset.novoData });
@@ -1377,7 +1379,7 @@ document.addEventListener('click', async ev => {
   const ep = t.closest('[data-editproj]'); if (ep) return modalProj(projeto(ep.dataset.editproj));
   const ac = t.closest('[data-acao]'); if (!ac) return;
   const a = ac.dataset.acao;
-  if (a !== 'excluirItem' && a !== 'excluirEv' && a !== 'excluirArea' && a !== 'excluirProj' && a !== 'excluirSerie') confirmar.ok = false;
+  if (a !== 'excluirDemanda' && a !== 'excluirItem' && a !== 'excluirEv' && a !== 'excluirArea' && a !== 'excluirProj' && a !== 'excluirSerie') confirmar.ok = false;
   switch (a) {
     case 'fechar': return fecharModal();
     case 'entrar': return entrar();
@@ -1398,6 +1400,8 @@ document.addEventListener('click', async ev => {
     case 'gEntrar': return gEntrar(!gCfg().ativo);
     case 'gSair': return gSair();
     case 'gDiag': return gDiagnostico();
+    case 'salvarDemanda': return salvarDemanda();
+    case 'excluirDemanda': return excluirDemanda();
     case 'addReuniaoOnline': return adicionarReuniaoOnline();
     case 'editarSerie': return modalSerie(modalEvento._e);
     case 'salvarSerie': return salvarSerie();
@@ -1461,6 +1465,7 @@ function aplicarMini(m) { document.body.classList.toggle('mini', m); $('#btnMini
 $('#btnMini').onclick = () => aplicarMini(!document.body.classList.contains('mini'));
 aplicarMini((() => { try { return localStorage.getItem('menuMini') !== '0'; } catch { return true; } })());
 $('#btnReuniao').onclick = () => novoItem({ tipo: 'reuniao' });
+$('#btnDemanda').onclick = () => modalDemanda(null, selProj && selProj.tipo === 'proj' ? selProj.id : '');
 
 /* ================= vincular eventos existentes ================= */
 const DOW = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
@@ -1516,6 +1521,76 @@ async function vincularEvento() {
     D.itens.push(it); salvar(); fecharModal(); faixaEventos = ''; render();
     toast(`Vinculado a ${p.nome}.`);
   } catch (er) { toast('Não consegui vincular: ' + er.message, true); }
+}
+
+/* ================= demandas rápidas ================= */
+function optsProjetos(sel) {
+  return D.areas.map(a => { const ps = D.projetos.filter(p => p.areaId === a.id); return ps.length ? `<optgroup label="${esc(a.nome)}">${ps.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</optgroup>` : ''; }).join('');
+}
+function calPadraoProjeto(pid) {
+  const p = projeto(pid), a = p && area(p.areaId);
+  return (a && a.calendarioId) || D.config.ultimoCal || '@principal';
+}
+function modalDemanda(it, pid) {
+  const novo = !it;
+  if (!D.projetos.length) return toast('Crie um projeto primeiro, em Empresas e projetos.', true);
+  const aviso = it && it.avisoId ? D.itens.find(i => i.id === it.avisoId) : null;
+  const lemb = (it && it.lembrarEm) || '';
+  const proj = (it && it.projetoId) || pid || '';
+  const calSel = (aviso && aviso.calendarioId) || calPadraoProjeto(proj);
+  const cals = todosCals().filter(k => k.podeEditar);
+  const optsCal = (cals.some(k => k.padrao) ? '' : `<option value="@principal">Outlook · Calendário principal</option>`) +
+    cals.map(k => { const v = k.padrao ? '@principal' : k.id; return `<option value="${esc(v)}" ${calSel === v || (k.padrao && !calSel) ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}</option>`; }).join('');
+  abrirModal(`<h3>${novo ? 'Nova demanda' : 'Demanda'}</h3>
+    <div class="f"><label>Projeto / obra</label><select id="dProj">${proj ? '' : '<option value="">— escolha —</option>'}${optsProjetos(proj)}</select></div>
+    <div class="f"><label>O que precisa ser feito</label><textarea id="dTit" style="min-height:60px" placeholder="Ex.: Enviar cronograma revisado para o cliente">${esc(it ? it.titulo : '')}</textarea></div>
+    <div class="fr"><div class="f"><label>Entregar até</label><input type="date" id="dPrazo" value="${it ? it.data : ''}"></div>
+      <div class="f"><label>Lembrar em (opcional)</label><div style="display:flex;gap:6px"><input type="date" id="dLembD" value="${lemb.slice(0, 10)}" style="flex:1"><input type="time" id="dLembH" value="${lemb.slice(11, 16) || '09:00'}" style="width:110px"></div></div></div>
+    <div class="box"><label class="cb" style="margin:0"><input type="checkbox" id="dAviso" ${!it || aviso ? 'checked' : ''}> Avisar também pela agenda (celular)</label>
+      <div class="f" style="margin:8px 0 0"><label>Agenda do aviso</label><select id="dCal">${optsCal}</select></div>
+      <div class="hint" style="margin-top:4px">Cria um evento curto "⏰ Lembrete" no dia e horário do lembrete, que notifica pelo app do Outlook ou do Google.</div></div>
+    ${it ? `<label class="cb"><input type="checkbox" id="dFeito" ${it.concluidas[it.data] ? 'checked' : ''}> Concluída</label>` : ''}
+    <div class="acts">${novo ? '' : '<button class="btn dan l" data-acao="excluirDemanda">Excluir</button>'}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarDemanda">Salvar</button></div>`);
+  modalDemanda._it = it;
+  $('#dProj').addEventListener('change', () => { if (!aviso) $('#dCal').value = calPadraoProjeto($('#dProj').value); });
+  const avisoVis = () => { $('#dCal').closest('.f').style.display = $('#dAviso').checked ? '' : 'none'; };
+  $('#dAviso').addEventListener('change', avisoVis); avisoVis();
+  setTimeout(() => $('#dTit').focus(), 30);
+}
+async function salvarDemanda() {
+  const pid = $('#dProj').value, tit = $('#dTit').value.trim(), prazo = $('#dPrazo').value;
+  if (!pid) return toast('Escolha o projeto.', true);
+  if (!tit) return toast('Descreva o que precisa ser feito.', true);
+  if (!prazo) return toast('Informe a data de entrega.', true);
+  const p = projeto(pid), lembD = $('#dLembD').value, lembrarEm = lembD ? `${lembD}T${$('#dLembH').value || '09:00'}` : '';
+  let it = modalDemanda._it;
+  if (!it) { it = novoItemBase({ tipo: 'entrega', demanda: true }); D.itens.push(it); }
+  const prazoAntigo = it.data;
+  Object.assign(it, { titulo: tit, projetoId: pid, areaId: p.areaId, data: prazo, hora: '', recorrencia: null, lembrarEm, sincronizar: false, calendarioId: calPadraoProjeto(pid) });
+  if ($('#dFeito')) { delete it.concluidas[prazoAntigo]; if ($('#dFeito').checked) it.concluidas[prazo] = true; else delete it.concluidas[prazo]; }
+  // aviso na agenda
+  let aviso = it.avisoId ? D.itens.find(i => i.id === it.avisoId) : null;
+  const querAviso = $('#dAviso').checked && lembrarEm;
+  fecharModal();
+  if (querAviso) {
+    if (!aviso) { aviso = novoItemBase({ tipo: 'tarefa', avisoDe: it.id }); D.itens.push(aviso); it.avisoId = aviso.id; }
+    Object.assign(aviso, { titulo: '⏰ Lembrete: ' + tit, projetoId: pid, areaId: p.areaId, data: lembrarEm.slice(0, 10), hora: lembrarEm.slice(11, 16), duracao: 15, lembrete: 0, sincronizar: true, calendarioId: $('#dCal').value, showAs: 'free', notas: `Prazo: ${fmtData(prazo)}`, _pend: true });
+    salvar(); render();
+    await sincronizar(aviso);
+  } else if (aviso) {
+    aviso.sincronizar = false; await sincronizar(aviso);
+    D.itens = D.itens.filter(i => i !== aviso); delete it.avisoId;
+  }
+  salvar(); faixaEventos = ''; render(); toast('Demanda salva.');
+}
+async function excluirDemanda() {
+  const it = modalDemanda._it; if (!it) return fecharModal();
+  if (!confirmar.ok) { confirmar.ok = true; $('[data-acao=excluirDemanda]').textContent = 'Confirmar exclusão'; return; }
+  confirmar.ok = false;
+  const aviso = it.avisoId ? D.itens.find(i => i.id === it.avisoId) : null;
+  if (aviso) { aviso.sincronizar = false; await sincronizar(aviso); }
+  D.itens = D.itens.filter(i => i !== it && i !== aviso);
+  fecharModal(); salvar(); faixaEventos = ''; render();
 }
 
 /* ================= links de reunião ================= */
@@ -1812,6 +1887,15 @@ const avisados = new Set();
 function verificarLembretes() {
   if (!D.config.notificacoes) return;
   const n = new Date(), hs = ymd(n), agora = n.getHours() * 60 + n.getMinutes();
+  const agoraTxt = `${hs}T${min2hm(agora)}`;
+  D.itens.forEach(it => {
+    if (!it.demanda || !it.lembrarEm || it.concluidas[it.data] || avisados.has('d' + it.id + it.lembrarEm)) return;
+    if (agoraTxt >= it.lembrarEm && agoraTxt.slice(0, 10) === it.lembrarEm.slice(0, 10)) {
+      avisados.add('d' + it.id + it.lembrarEm);
+      const p = projeto(it.projetoId);
+      notificar('Lembrete: ' + it.titulo, `${p ? p.nome + ' · ' : ''}prazo ${fmtData(it.data)}`);
+    }
+  });
   D.itens.forEach(it => {
     if (!it.hora || (it.sincronizar && it.outlook)) return;
     if (!ocorrencias(it, hoje0(), hoje0()).length || it.concluidas[hs]) return;
