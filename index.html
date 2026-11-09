@@ -82,6 +82,9 @@ a{color:var(--accent)}
 .ev{position:absolute;border-radius:5px;padding:2px 5px;font-size:11.5px;overflow:hidden;color:#fff;cursor:pointer;line-height:1.25;border:1px solid rgba(255,255,255,.6)}
 .ev.done{opacity:.45}
 .ev.movel{cursor:grab;touch-action:none}
+@keyframes gira{to{transform:rotate(360deg)}}
+.btn.girando{animation:gira 1s linear infinite}
+.semana,.mes,.wk{touch-action:pan-y}
 .ev .rs{position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
 .ev.arrastando{opacity:.85;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.3);cursor:grabbing;transition:none}
 body.arrastando,body.arrastando *{user-select:none!important}
@@ -395,7 +398,7 @@ async function token(esc = SCOPES) {
 }
 // fila: a Microsoft permite no máximo 4 consultas simultâneas por caixa de correio
 let ativos = 0; const fila = [];
-async function vez() { if (ativos < 2) { ativos++; return; } await new Promise(r => fila.push(r)); ativos++; }
+async function vez() { if (ativos < 3) { ativos++; return; } await new Promise(r => fila.push(r)); ativos++; }
 function libera() { ativos--; const n = fila.shift(); if (n) n(); }
 const espera = ms => new Promise(r => setTimeout(r, ms));
 async function graph(method, path, body, escopos) {
@@ -456,38 +459,69 @@ async function _carregarCalendarios() {
 }
 function tzOff() { const m = -new Date().getTimezoneOffset(), a = Math.abs(m); return (m >= 0 ? '+' : '-') + pad(Math.floor(a / 60)) + ':' + pad(a % 60); }
 const corCal = (c, i) => c.cor || CORES[(i + 4) % CORES.length];
-async function carregarEventos(ini, fim, forcar) {
+let ultimaFaixa = null, atualizadoEm = null, carregando = 0, ultimaAssin = '';
+async function carregarEventos(ini, fim, forcar, silencioso) {
   if (!conectado() && !gOk()) return;
   const chave = ymd(ini) + '|' + ymd(fim) + '|' + (D.config.calendariosVisiveis || []).join(',') + '|' + conectado() + gOk();
   if (!forcar && chave === faixaEventos) return;
-  faixaEventos = chave;
+  const mudouFaixa = chave !== faixaEventos;
+  faixaEventos = chave; ultimaFaixa = { ini, fim };
   const minha = ++carregarEventos.seq;
-  const lista = [];
-  if (conectado()) {
-    try {
-      if (!calendarios.length) await carregarCalendarios();
-      const vis = calendarios.filter(c => (D.config.calendariosVisiveis || []).includes(c.id));
-      const off = tzOff(), sd = encodeURIComponent(ymd(ini) + 'T00:00:00' + off), ed = encodeURIComponent(ymd(addDays(fim, 1)) + 'T00:00:00' + off);
-      for (const c of vis) {
-        let url = `${calPath(c.id)}/calendarView?startDateTime=${sd}&endDateTime=${ed}&$top=250&$select=id,subject,start,end,isAllDay,location,organizer,webLink,onlineMeeting,seriesMasterId,isCancelled,showAs,categories,isOnlineMeeting,attendees,isOrganizer`;
-        while (url) {
-          const j = await graph('GET', url);
-          j.value.forEach(e => { if (!e.isCancelled) lista.push(Object.assign(e, { _cal: c })); });
-          url = j['@odata.nextLink'];
-        }
-      }
-      erroOutlook = '';
-    } catch (e) { erroOutlook = e.message; console.error(e); }
-  }
-  if (gOk()) {
-    try { await gEventos(ini, fim, lista); erroGoogle = ''; }
-    catch (e) { erroGoogle = e.message; console.error(e); }
-  }
+  carregando++; marcarCarregando();
+  const vis = new Set(D.config.calendariosVisiveis || []);
+  const off = tzOff(), sd = encodeURIComponent(ymd(ini) + 'T00:00:00' + off), ed = encodeURIComponent(ymd(addDays(fim, 1)) + 'T00:00:00' + off);
+  const anteriores = mudouFaixa ? [] : eventos;
+  const porCal = async (c, busca) => {
+    try { const l = await busca(c); return l; }
+    catch (e) { console.error(c.nome, e); if (c.fonte === 'google') erroGoogle = e.message; else erroOutlook = e.message; return anteriores.filter(x => x._cal.id === c.id); }
+  };
+  const buscaOutlook = async c => {
+    const l = []; let url = `${calPath(c.id)}/calendarView?startDateTime=${sd}&endDateTime=${ed}&$top=250&$select=id,subject,start,end,isAllDay,location,organizer,webLink,onlineMeeting,seriesMasterId,isCancelled,showAs,categories,isOnlineMeeting,attendees,isOrganizer`;
+    while (url) { const j = await graph('GET', url); j.value.forEach(e => { if (!e.isCancelled) l.push(Object.assign(e, { _cal: c })); }); url = j['@odata.nextLink']; }
+    return l;
+  };
+  const buscaGoogle = async c => {
+    const l = []; let pt = '';
+    do {
+      const j = await gapi('GET', `/calendars/${encodeURIComponent(c.gid)}/events?timeMin=${sd}&timeMax=${ed}&singleEvents=true&maxResults=2500&timeZone=${encodeURIComponent(GTZ)}${pt ? '&pageToken=' + encodeURIComponent(pt) : ''}`);
+      (j.items || []).forEach(ev => { if (ev.status !== 'cancelled' && ev.start) l.push(gNormalizar(ev, c)); });
+      pt = j.nextPageToken;
+    } while (pt);
+    return l;
+  };
+  const tarefas = [];
+  if (conectado()) tarefas.push((async () => {
+    if (!calendarios.length) await carregarCalendarios();
+    const r = await Promise.all(calendarios.filter(c => vis.has(c.id)).map(c => porCal(c, buscaOutlook)));
+    return r.flat();
+  })().catch(e => { erroOutlook = e.message; return anteriores.filter(x => x._cal.fonte !== 'google'); }));
+  if (gOk()) tarefas.push((async () => {
+    if (!calendariosG.length) await gCarregarCalendarios();
+    return (await Promise.all(calendariosG.filter(c => vis.has(c.id)).map(c => porCal(c, buscaGoogle)))).flat();
+  })().catch(e => { erroGoogle = e.message; return anteriores.filter(x => x._cal.fonte === 'google'); }));
+  const errosAntes = erroOutlook + erroGoogle;
+  erroOutlook = ''; erroGoogle = '';
+  const lista = (await Promise.all(tarefas)).flat();
+  carregando--; marcarCarregando();
   if (minha !== carregarEventos.seq) return; // chegou uma busca mais nova; descarta esta
-  eventos = lista;
-  calsCarregados = new Set(lista.map(e => e._cal.id).concat(todosCals().filter(c => (D.config.calendariosVisiveis || []).includes(c.id) && (c.fonte === 'google' ? gOk() : conectado())).map(c => c.id)));
+  const assin = JSON.stringify(lista.map(e => [e.id, e.start.dateTime, e.end.dateTime, e.subject, e.showAs, (e.categories || []).join(), e._cal.id, e.gColor]));
+  eventos = lista; atualizadoEm = new Date();
+  calsCarregados = new Set(lista.map(e => e._cal.id).concat(todosCals().filter(c => vis.has(c.id) && (c.fonte === 'google' ? gOk() : conectado())).map(c => c.id)));
   if (conectado() && !categorias && !categorias_tentou) carregarCategorias();
-  render();
+  const mudou = assin !== ultimaAssin || errosAntes !== erroOutlook + erroGoogle;
+  ultimaAssin = assin;
+  if (!silencioso || mudou) render(); else marcarCarregando();
+}
+function marcarCarregando() {
+  const b = $('[data-acao=recarregar]'); if (b) b.classList.toggle('girando', carregando > 0);
+  const t = $('#atualizado'); if (t) t.textContent = carregando > 0 ? 'atualizando…' : (atualizadoEm ? 'atualizado às ' + atualizadoEm.toTimeString().slice(0, 5) : '');
+}
+let ultimoRefresh = 0;
+function atualizarAgora() {
+  if (!ultimaFaixa || !['hoje', 'semana', 'calendario'].includes(vista)) return;
+  if ($('#modalBg').classList.contains('on') || (drag && drag.ativo) || document.visibilityState !== 'visible') return;
+  ultimoRefresh = Date.now();
+  carregarEventos(ultimaFaixa.ini, ultimaFaixa.fim, true, true);
 }
 carregarEventos.seq = 0;
 let calsCarregados = new Set();
@@ -851,6 +885,7 @@ function render() {
   const sc = $('#view').scrollTop;
   $('#view').innerHTML = f();
   if (vista === 'calendario' && modoCal === 'semana') posicionarCalendario();
+  marcarCarregando();
   $('#view').scrollTop = sc;
 }
 let filtroAberto = false;
@@ -912,7 +947,7 @@ function vSemana() {
   carregarEventos(ini, fim);
   const ent = entradas(ini, fim);
   let html = `<div class="cal-head"><button class="btn" data-acao="semAnt">‹</button><button class="btn" data-acao="semHoje">Esta semana</button><button class="btn" data-acao="semProx">›</button>
-    <span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span></div><div class="semana">`;
+    <span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span><span style="flex:1"></span><span id="atualizado" class="hint"></span>${conectado() || gOk() ? `<button class="btn ${carregando ? 'girando' : ''}" data-acao="recarregar" title="Buscar as agendas de novo">⟳</button>` : ''}</div><div class="semana">`;
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i)), lst = ent.filter(x => x.data === d), dd = addDays(ini, i);
     html += `<div class="dia ${d === hs ? 'hoje' : ''}"><h4><span style="text-transform:capitalize">${DIAS_L[dd.getDay()].replace('-feira', '')}</span><small>${dd.getDate()}/${pad(dd.getMonth() + 1)}</small></h4>
@@ -927,7 +962,7 @@ function vCalendario() {
   const head = `<div class="cal-head"><button class="btn" data-acao="calAnt">‹</button><button class="btn" data-acao="calHoje">Hoje</button><button class="btn" data-acao="calProx">›</button>
     <span class="lbl" id="calLbl"></span><span style="flex:1"></span>
     <button class="btn ${modoCal === 'semana' ? 'pri' : ''}" data-acao="modoSemana">Semana</button><button class="btn ${modoCal === 'mes' ? 'pri' : ''}" data-acao="modoMes">Mês</button>
-    ${conectado() || gOk() ? `<button class="btn" data-acao="recarregar" title="Buscar as agendas de novo">⟳</button>` : ''}</div>`;
+    ${conectado() || gOk() ? `<span id="atualizado" class="hint" style="margin-left:4px"></span><button class="btn ${carregando ? 'girando' : ''}" data-acao="recarregar" title="Buscar as agendas de novo">⟳</button>` : ''}</div>`;
   const hs = ymd(hoje0());
   if (modoCal === 'mes') {
     const m0 = new Date(refCal.getFullYear(), refCal.getMonth(), 1), ini = domingo(m0), fim = addDays(ini, 41);
@@ -1200,7 +1235,7 @@ function modalEvento(e) {
     ${edit ? `<div class="f"><label>Título</label><input id="eTit" value="${esc(e.subject)}"></div>
     <div class="fr"><div class="f"><label>Data</label><input type="date" id="eData" value="${sd}"></div>${e.isAllDay ? '' : `<div class="f"><label>Início</label><input type="time" id="eIni" value="${st}"></div><div class="f"><label>Fim</label><input type="time" id="eFim" value="${en}"></div>`}</div>
     <div class="f"><label>Local</label><input id="eLocal" value="${esc(e.location && e.location.displayName)}"></div>
-    ${e.seriesMasterId ? '<p class="hint">As alterações valem só para esta ocorrência.</p>' : ''}`
+    ${e.seriesMasterId ? `<p class="hint">As alterações acima valem só para esta ocorrência. <button class="btn sm" data-acao="editarSerie">Editar a série inteira…</button></p>` : ''}`
       : `<p>${fmtData(sd)} ${e.isAllDay ? '(dia todo)' : st + '–' + en}</p>${e.location && e.location.displayName ? `<p>Local: ${esc(e.location.displayName)}</p>` : ''}<p class="hint">Este calendário é só para leitura.</p>`}
     <p>${join ? `<a href="${esc(join)}" target="_blank">Entrar na reunião online</a> · ` : ''}${e.webLink ? `<a href="${esc(e.webLink)}" target="_blank">Abrir no ${c.fonte === 'google' ? 'Google Agenda' : 'Outlook'}</a>` : ''}</p>
     <div class="box"><label class="hint" style="font-weight:600">Vincular a um projeto</label>
@@ -1296,7 +1331,7 @@ document.addEventListener('click', async ev => {
   const ep = t.closest('[data-editproj]'); if (ep) return modalProj(projeto(ep.dataset.editproj));
   const ac = t.closest('[data-acao]'); if (!ac) return;
   const a = ac.dataset.acao;
-  if (a !== 'excluirItem' && a !== 'excluirEv' && a !== 'excluirArea' && a !== 'excluirProj') confirmar.ok = false;
+  if (a !== 'excluirItem' && a !== 'excluirEv' && a !== 'excluirArea' && a !== 'excluirProj' && a !== 'excluirSerie') confirmar.ok = false;
   switch (a) {
     case 'fechar': return fecharModal();
     case 'entrar': return entrar();
@@ -1313,10 +1348,13 @@ document.addEventListener('click', async ev => {
     case 'calHoje': refCal = hoje0(); return render();
     case 'modoSemana': modoCal = 'semana'; return render();
     case 'modoMes': modoCal = 'mes'; return render();
-    case 'recarregar': faixaEventos = ''; calendarios = []; calendariosG = []; categorias_tentou = false; categorias = null; calsPromessa = null; erroOutlook = ''; erroGoogle = ''; return render();
+    case 'recarregar': faixaEventos = ''; ultimaAssin = ''; calendarios = []; calendariosG = []; categorias_tentou = false; categorias = null; calsPromessa = null; erroOutlook = ''; erroGoogle = ''; return render();
     case 'gEntrar': return gEntrar(!gCfg().ativo);
     case 'gSair': return gSair();
     case 'gDiag': return gDiagnostico();
+    case 'editarSerie': return modalSerie(modalEvento._e);
+    case 'salvarSerie': return salvarSerie();
+    case 'excluirSerie': return excluirSerie();
     case 'ativarCat': return ativarCategorias();
     case 'abrirFiltro': filtroAberto = !filtroAberto; return renderFiltros();
     case 'filtroTodas': filtroOff.clear(); gravarFiltro(); return render();
@@ -1428,6 +1466,153 @@ async function vincularEvento() {
     D.itens.push(it); salvar(); fecharModal(); faixaEventos = ''; render();
     toast(`Vinculado a ${p.nome}.`);
   } catch (er) { toast('Não consegui vincular: ' + er.message, true); }
+}
+
+/* ================= navegar arrastando para os lados ================= */
+function navegar(dir) {
+  if (vista === 'semana') refSemana = addDays(refSemana, 7 * dir);
+  else if (vista === 'calendario' && modoCal === 'mes') refCal = new Date(refCal.getFullYear(), refCal.getMonth() + dir, 1);
+  else if (vista === 'calendario') refCal = addDays(refCal, 7 * dir);
+  else return;
+  render();
+}
+let swipe = null;
+const alvoSwipe = () => $('#view .wk, #view .mes, #view .semana');
+document.addEventListener('pointerdown', ev => {
+  if (!['semana', 'calendario'].includes(vista) || ev.button !== 0) return;
+  if (!ev.target.closest('#view') || ev.target.closest('.ev.movel, button, input, select, a, textarea, .cal-head')) return;
+  swipe = { x: ev.clientX, y: ev.clientY, ativo: false };
+});
+document.addEventListener('pointermove', ev => {
+  if (!swipe || (drag && drag.ativo)) return;
+  const dx = ev.clientX - swipe.x, dy = ev.clientY - swipe.y;
+  if (!swipe.ativo) { if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.5) { swipe.ativo = true; document.body.classList.add('arrastando'); } else if (Math.abs(dy) > 12) { swipe = null; return; } else return; }
+  const el = alvoSwipe(); if (el) { el.style.transition = 'none'; el.style.transform = `translateX(${dx * 0.5}px)`; el.style.opacity = String(Math.max(.4, 1 - Math.abs(dx) / 600)); }
+});
+document.addEventListener('pointerup', ev => {
+  if (!swipe) return;
+  const s0 = swipe; swipe = null; document.body.classList.remove('arrastando');
+  if (!s0.ativo) return;
+  suprimirClique = true; setTimeout(() => suprimirClique = false, 50);
+  const dx = ev.clientX - s0.x, el = alvoSwipe();
+  if (Math.abs(dx) > 70) navegar(dx < 0 ? 1 : -1);
+  else if (el) { el.style.transition = 'transform .15s, opacity .15s'; el.style.transform = ''; el.style.opacity = ''; }
+});
+document.addEventListener('pointercancel', () => { if (swipe) { swipe = null; document.body.classList.remove('arrastando'); const el = alvoSwipe(); if (el) { el.style.transform = ''; el.style.opacity = ''; } } });
+let rodaAcum = 0, rodaPausa = 0;
+document.addEventListener('wheel', ev => {
+  if (!['semana', 'calendario'].includes(vista) || $('#modalBg').classList.contains('on')) return;
+  if (Math.abs(ev.deltaX) <= Math.abs(ev.deltaY) * 1.2) return;
+  if (Date.now() < rodaPausa) return;
+  rodaAcum += ev.deltaX;
+  if (Math.abs(rodaAcum) > 140) { navegar(rodaAcum > 0 ? 1 : -1); rodaAcum = 0; rodaPausa = Date.now() + 700; }
+}, { passive: true });
+document.addEventListener('keydown', ev => {
+  if ($('#modalBg').classList.contains('on') || ev.target.matches('input,textarea,select')) return;
+  if (ev.key === 'ArrowLeft') navegar(-1); else if (ev.key === 'ArrowRight') navegar(1);
+});
+
+/* ================= editar série de eventos da agenda ================= */
+function htmlRec(rec) {
+  const r = rec || {}, repetir = rec ? r.freq : 'nao', dsel = r.dias || [], it = { recorrencia: rec };
+  return `  <div class="box"><div class="fr"><div class="f"><label>Repetir</label><select id="iRep">
+      <option value="nao" ${repetir === 'nao' ? 'selected' : ''}>Não repete</option><option value="diaria" ${repetir === 'diaria' ? 'selected' : ''}>Diariamente</option>
+      <option value="semanal" ${repetir === 'semanal' ? 'selected' : ''}>Semanalmente</option><option value="mensal" ${repetir === 'mensal' ? 'selected' : ''}>Mensalmente</option></select></div>
+    <div class="f rep"><label>A cada</label><input type="number" id="iInt" min="1" value="${r.intervalo || 1}"></div>
+    <div class="f rep"><label>Até (opcional)</label><input type="date" id="iAte" value="${r.ate || ''}"></div></div>
+    <div class="f rep-sem"><label>Repetir nos dias <span style="font-weight:400">(marque os dias para repetir toda semana)</span></label><div class="dows" style="flex-wrap:wrap">${[0, 1, 2, 3, 4, 5, 6].map(i => `<label><input type="checkbox" class="iDow" value="${i}" ${dsel.includes(i) && it.recorrencia && r.freq === 'semanal' ? 'checked' : ''}><span>${DIAS[i]}</span></label>`).join('')}
+      <span style="width:8px"></span><button type="button" class="btn sm" data-dows="1,2,3,4,5">Seg–Sex</button><button type="button" class="btn sm" data-dows="0,1,2,3,4,5,6">Todos</button><button type="button" class="btn sm" data-dows="">Nenhum</button></div></div>
+    <div class="fr rep-mes"><div class="f"><label>Modo</label><select id="iModo"><option value="dia" ${r.modoMensal !== 'posicao' ? 'selected' : ''}>No dia do mês</option><option value="posicao" ${r.modoMensal === 'posicao' ? 'selected' : ''}>Na n-ésima semana</option></select></div>
+      <div class="f mm-dia"><label>Dia</label><input type="number" id="iDiaMes" min="1" max="31" value="${r.diaMes || ''}"></div>
+      <div class="f mm-pos"><label>Qual</label><select id="iPos">${[1, 2, 3, 4, -1].map(p => `<option value="${p}" ${+r.posicao === p ? 'selected' : ''}>${POS[p]}</option>`).join('')}</select></div>
+      <div class="f mm-pos"><label>Dia da semana</label><select id="iDsem">${[1, 2, 3, 4, 5, 6, 0].map(i => `<option value="${i}" ${+r.diaSemana === i ? 'selected' : ''}>${DIAS_L[i]}</option>`).join('')}</select></div></div>
+  </div>`;
+}
+function ligarRec(dataPadrao) {
+  const updRec = () => {
+    const rep = $('#iRep').value;
+    $$('.rep').forEach(e => e.style.display = rep === 'nao' ? 'none' : '');
+    $$('.rep-sem').forEach(e => e.style.display = rep === 'semanal' || rep === 'nao' ? '' : 'none');
+    $$('.rep-mes').forEach(e => e.style.display = rep === 'mensal' ? '' : 'none');
+    const pos = $('#iModo').value === 'posicao';
+    $$('.mm-dia').forEach(e => e.style.display = pos ? 'none' : ''); $$('.mm-pos').forEach(e => e.style.display = pos ? '' : 'none');
+  };
+  const diasMudaram = () => { const n = $$('.iDow:checked').length, rep = $('#iRep').value; if (n && rep !== 'semanal') $('#iRep').value = 'semanal'; if (!n && rep === 'semanal') $('#iRep').value = 'nao'; updRec(); };
+  ['#iRep', '#iModo'].forEach(s => $(s).addEventListener('change', updRec));
+  $$('.iDow').forEach(c => c.addEventListener('change', diasMudaram));
+  $$('[data-dows]').forEach(b => b.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); const sel = b.dataset.dows ? b.dataset.dows.split(',').map(Number) : []; $$('.iDow').forEach(c => c.checked = sel.includes(+c.value)); diasMudaram(); }));
+  $('#iRep').addEventListener('change', () => { if ($('#iRep').value === 'semanal' && !$$('.iDow:checked').length) { const d = parseYmd(dataPadrao).getDay(); $$('.iDow').forEach(c => c.checked = +c.value === d); } updRec(); });
+  updRec();
+}
+function lerRec(dataInicio) {
+  const rep = $('#iRep').value; if (rep === 'nao') return null;
+  const rec = { freq: rep, intervalo: Math.max(1, +$('#iInt').value || 1), ate: $('#iAte').value || '' };
+  if (rep === 'semanal') { rec.dias = $$('.iDow:checked').map(x => +x.value); if (!rec.dias.length) rec.dias = [parseYmd(dataInicio).getDay()]; }
+  if (rep === 'mensal') {
+    rec.modoMensal = $('#iModo').value;
+    if (rec.modoMensal === 'posicao') { rec.posicao = +$('#iPos').value; rec.diaSemana = +$('#iDsem').value; }
+    else rec.diaMes = Math.min(31, Math.max(1, +$('#iDiaMes').value || parseYmd(dataInicio).getDate()));
+  }
+  return rec;
+}
+async function modalSerie(e) {
+  const c = e._cal, g = c.fonte === 'google';
+  abrirModal('<h3>Carregando a série…</h3>');
+  try {
+    let base;
+    if (g) {
+      const m = await gapi('GET', gEv(c.id, e.seriesMasterId) + '?timeZone=' + encodeURIComponent(GTZ));
+      const dia = !!m.start.date;
+      base = { titulo: m.summary || '', ini: dia ? m.start.date + 'T00:00:00' : m.start.dateTime.slice(0, 19), fim: dia ? m.end.date + 'T00:00:00' : m.end.dateTime.slice(0, 19), dia, local: m.location || '', transp: m.transparency };
+      try { base.rec = recDeGoogle(m.recurrence, base.ini.slice(0, 10)); } catch (x) { base.recErro = x.message; }
+    } else {
+      const m = await graph('GET', `${calPath(c.id)}/events/${e.seriesMasterId}?$select=subject,start,end,isAllDay,recurrence,location,showAs`);
+      base = { titulo: m.subject || '', ini: m.start.dateTime.slice(0, 19), fim: m.end.dateTime.slice(0, 19), dia: m.isAllDay, local: (m.location && m.location.displayName) || '', showAs: m.showAs };
+      try { base.rec = recDeGraph(m.recurrence, base.ini.slice(0, 10)); } catch (x) { base.recErro = x.message; }
+    }
+    modalSerie._s = { c, g, base, id: e.seriesMasterId };
+    const sa = g ? (base.transp === 'transparent' ? 'free' : 'busy') : (base.showAs || 'busy');
+    abrirModal(`<h3>Editar série</h3>
+      <p class="hint">${g ? 'Google' : 'Outlook'} · ${esc(c.nome)} · a série começou em ${fmtData(base.ini.slice(0, 10))}. As alterações valem para <b>todas</b> as ocorrências.</p>
+      <div class="f"><label>Título</label><input id="sTit" value="${esc(base.titulo)}"></div>
+      <div class="fr">${base.dia ? '<div class="hint" style="padding:8px 0">Evento de dia inteiro</div>' : `<div class="f"><label>Início</label><input type="time" id="sIni" value="${base.ini.slice(11, 16)}"></div><div class="f"><label>Fim</label><input type="time" id="sFim" value="${base.fim.slice(11, 16)}"></div>`}
+        <div class="f"><label>Mostrar como</label><select id="sSA">${(g ? ['busy', 'free'] : ['busy', 'tentative', 'free', 'oof', 'workingElsewhere']).map(k => `<option value="${k}" ${sa === k ? 'selected' : ''}>${SHOWAS[k]}</option>`).join('')}</select></div></div>
+      ${base.recErro ? `<p class="tag err" style="display:block;padding:8px">A repetição desta série não pode ser editada aqui (${esc(base.recErro)}). Título e horário podem.</p>` : htmlRec(base.rec)}
+      <div class="f"><label>Local</label><input id="sLocal" value="${esc(base.local)}"></div>
+      <p class="hint">Mudar a repetição pode desfazer alterações feitas em ocorrências isoladas.</p>
+      <div class="acts"><button class="btn dan l" data-acao="excluirSerie">Excluir série</button><button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarSerie">Salvar série</button></div>`);
+    if (!base.recErro) { const o = $('#iRep option[value=nao]'); if (o) o.textContent = '(manter como está)'; ligarRec(base.ini.slice(0, 10)); }
+  } catch (x) { abrirModal(`<h3>Não consegui abrir a série</h3><p>${esc(x.message)}</p><div class="acts"><button class="btn" data-acao="fechar">Fechar</button></div>`); }
+}
+async function salvarSerie() {
+  const { c, g, base, id } = modalSerie._s, d0 = base.ini.slice(0, 10);
+  const tit = $('#sTit').value.trim() || base.titulo, ini = base.dia ? '' : $('#sIni').value, fim = base.dia ? '' : $('#sFim').value;
+  const rec = base.recErro ? null : lerRec(d0);
+  const mudouRec = !!rec && JSON.stringify(rec) !== JSON.stringify(base.rec);
+  const primeiro = mudouRec ? primeiraOcorrencia({ data: d0, recorrencia: rec, concluidas: {} }) : d0;
+  const mudouHora = primeiro !== d0 || (!base.dia && (ini !== base.ini.slice(11, 16) || fim !== base.fim.slice(11, 16)));
+  const dFim = !base.dia && fim <= ini ? ymd(addDays(parseYmd(primeiro), 1)) : primeiro, sa = $('#sSA').value;
+  try {
+    if (g) {
+      const body = { summary: tit, location: $('#sLocal').value, transparency: sa === 'free' ? 'transparent' : 'opaque' };
+      if (mudouHora) { if (base.dia) { body.start = { date: primeiro }; body.end = { date: ymd(addDays(parseYmd(primeiro), 1)) }; } else { body.start = { dateTime: `${primeiro}T${ini}:00`, timeZone: GTZ }; body.end = { dateTime: `${dFim}T${fim}:00`, timeZone: GTZ }; } }
+      if (mudouRec) body.recurrence = [gRrule({ recorrencia: rec, data: primeiro, hora: ini })];
+      await gapi('PATCH', gEv(c.id, id), body);
+    } else {
+      const body = { subject: tit, location: { displayName: $('#sLocal').value }, showAs: sa };
+      if (mudouHora || mudouRec) { const st = base.dia ? `${primeiro}T00:00:00` : `${primeiro}T${ini}:00`, en = base.dia ? `${ymd(addDays(parseYmd(primeiro), 1))}T00:00:00` : `${dFim}T${fim}:00`; body.start = { dateTime: st, timeZone: D.config.fuso }; body.end = { dateTime: en, timeZone: D.config.fuso }; }
+      if (mudouRec) body.recurrence = recorrenciaGraph({ recorrencia: rec, data: primeiro }, primeiro);
+      await graph('PATCH', `${calPath(c.id)}/events/${id}`, body);
+    }
+    toast('Série atualizada.'); fecharModal(); faixaEventos = ''; ultimaAssin = ''; render();
+  } catch (x) { toast((g ? 'Google: ' : 'Outlook: ') + x.message, true); }
+}
+async function excluirSerie() {
+  const { c, g, id } = modalSerie._s;
+  if (!confirmar.ok) { confirmar.ok = true; $('[data-acao=excluirSerie]').textContent = 'Confirmar: apagar todas as ocorrências'; return; }
+  confirmar.ok = false;
+  try { if (g) await gapi('DELETE', gEv(c.id, id)); else await graph('DELETE', `${calPath(c.id)}/events/${id}`); toast('Série excluída.'); fecharModal(); faixaEventos = ''; render(); }
+  catch (x) { toast((g ? 'Google: ' : 'Outlook: ') + x.message, true); }
 }
 
 /* ================= arrastar no calendário ================= */
@@ -1586,7 +1771,9 @@ function telaLogin(msg) {
   pedirNotif();
   setInterval(verificarLembretes, 30000); verificarLembretes();
   setInterval(() => { if (vista === 'calendario') posicionarCalendario(); }, 60000);
-  setInterval(() => { faixaEventos = ''; if (['hoje', 'semana', 'calendario'].includes(vista) && !$('#modalBg').classList.contains('on')) render(); }, 5 * 60000);
+  setInterval(atualizarAgora, 60000);
+  window.addEventListener('focus', () => { if (Date.now() - ultimoRefresh > 8000) atualizarAgora(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - ultimoRefresh > 8000) atualizarAgora(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') recarregarSeMudou(); });
   window.addEventListener('beforeunload', e => { if (alterado) { gravar(); e.preventDefault(); } });
 })();
