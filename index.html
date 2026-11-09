@@ -646,13 +646,18 @@ async function sincronizar(it) {
     if (!it.sincronizar) { if (it.outlook) { await apagarEventoDoItem(it.outlook); it.outlook = null; } it.erroSync = ''; return; }
     if (it.outlook && it.outlook.calendarId !== cal) { await apagarEventoDoItem(it.outlook); it.outlook = null; }
     if (alvoG) {
-      const body = payloadGoogle(it), conv = it.tipo === 'reuniao' ? '?sendUpdates=all' : '';
-      if (it.outlook) await gapi('PATCH', gEv(cal, it.outlook.eventId) + conv, body);
-      else { const r = await gapi('POST', `/calendars/${encodeURIComponent(cal.slice(2))}/events${conv}`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
+      const body = payloadGoogle(it), conv = it.tipo === 'reuniao' ? '?sendUpdates=all&conferenceDataVersion=1' : '';
+      let r;
+      if (it.outlook) r = await gapi('PATCH', gEv(cal, it.outlook.eventId) + conv, body);
+      else { r = await gapi('POST', `/calendars/${encodeURIComponent(cal.slice(2))}/events${conv}`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
+      if (r && r.hangoutLink) it.linkReuniao = r.hangoutLink;
+      else if (body.conferenceData) { await espera(1500); const r2 = await gapi('GET', gEv(cal, it.outlook.eventId)).catch(() => null); if (r2 && r2.hangoutLink) it.linkReuniao = r2.hangoutLink; }
     } else {
       const body = payloadEvento(it);
-      if (it.outlook) await graph('PATCH', `${calPath(cal)}/events/${it.outlook.eventId}`, body);
-      else { const r = await graph('POST', `${calPath(cal)}/events`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
+      let r;
+      if (it.outlook) r = await graph('PATCH', `${calPath(cal)}/events/${it.outlook.eventId}`, body);
+      else { r = await graph('POST', `${calPath(cal)}/events`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
+      if (r && r.onlineMeeting && r.onlineMeeting.joinUrl) it.linkReuniao = r.onlineMeeting.joinUrl;
     }
     it.erroSync = ''; delete it._pend;
     if (it.vinculado) { it.recImport = JSON.stringify(it.recorrencia); it.showAsImport = it.showAs || 'busy'; }
@@ -782,7 +787,10 @@ function payloadGoogle(it) {
     if (JSON.stringify(it.recorrencia) !== it.recImport) min.recurrence = ev.recurrence;
     return min;
   }
-  if (it.tipo === 'reuniao') ev.attendees = (it.participantes || '').split(/[,;\s]+/).filter(x => x.includes('@')).map(email => ({ email }));
+  if (it.tipo === 'reuniao') {
+    ev.attendees = (it.participantes || '').split(/[,;\s]+/).filter(x => x.includes('@')).map(email => ({ email }));
+    if (it.teams && !it.linkReuniao) ev.conferenceData = { createRequest: { requestId: it.id + '-' + Date.now(), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
+  }
   return ev;
 }
 const gEv = (calId, evId) => `/calendars/${encodeURIComponent(calId.slice(2))}/events/${encodeURIComponent(evId)}`;
@@ -849,6 +857,7 @@ function entradas(ini, fim) {
     if (dono) {
       if (!dono.recorrencia && !e.isAllDay && !dono.erroSync && (dono.data !== sd || dono.hora !== st)) { dono.data = sd; dono.hora = st; dono.duracao = Math.max(15, hm2min(en) - hm2min(st)); salvar(); }
       if (dono.excecoes && dono.excecoes[sd] && dono.excecoes[sd].cancelada) return;
+      if (e.onlineMeeting && e.onlineMeeting.joinUrl && dono.linkReuniao !== e.onlineMeeting.joinUrl) dono.linkReuniao = e.onlineMeeting.joinUrl;
       if (e.showAs && !dono._pend && dono.showAs !== e.showAs && !e.seriesMasterId) { dono.showAs = e.showAs; if (dono.vinculado) dono.showAsImport = e.showAs; }
       base = { k: 'item', it: dono, orig: sd, titulo: dono.vinculado ? (e.subject || dono.titulo) : dono.titulo, cor: corEvento(e, corBase), sa: e.showAs, feito: !!dono.concluidas[sd], ev: e };
     } else base = { k: 'ev', e, titulo: e.subject || '(sem título)', cor: corEvento(e, corBase), sa: e.showAs, feito: false };
@@ -1172,7 +1181,8 @@ function modalItem(it, novo) {
   </div>
   <div class="reu"><div class="f"><label>Participantes (e-mails separados por vírgula)</label><input id="iPart" value="${esc(it.participantes)}"></div>
     <div class="fr"><div class="f"><label>Local</label><input id="iLocal" value="${esc(it.local)}"></div></div>
-    <label class="cb"><input type="checkbox" id="iTeams" ${it.teams ? 'checked' : ''}> Criar como reunião do Teams</label></div>
+    <label class="cb"><input type="checkbox" id="iTeams" ${it.teams || it.linkReuniao ? 'checked' : ''}> Criar link de reunião online <span class="hint">(Google Meet nas agendas do Google · Teams no Outlook)</span></label>
+    ${it.linkReuniao ? `<div class="box" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Link:</b> <a href="${esc(it.linkReuniao)}" target="_blank" style="word-break:break-all;flex:1">${esc(it.linkReuniao)}</a><button type="button" class="btn sm" data-copiar="${esc(it.linkReuniao)}">Copiar link</button><button type="button" class="btn sm" data-convite="${it.id}">Copiar convite</button></div>` : ''}</div>
   <div class="fr"><div class="f"><label>Mostrar como</label><select id="iSA">${['busy', 'tentative', 'free', 'oof', 'workingElsewhere'].map(k => `<option value="${k}" ${(it.showAs || 'busy') === k ? 'selected' : ''}>${SHOWAS[k]}</option>`).join('')}</select></div>
     <div class="f"><label>Lembrete (min antes)</label><input type="number" id="iLemb" min="0" value="${it.lembrete}"></div><div class="f" style="flex:2;justify-content:flex-end">
     ${it.vinculado ? `<div class="hint">Vinculado a um evento que já existia na agenda.</div>` : '<div class="hint">Com data, o item é gravado como evento na agenda escolhida.</div>'}
@@ -1268,7 +1278,9 @@ function modalEvento(e) {
     <div class="f"><label>Local</label><input id="eLocal" value="${esc(e.location && e.location.displayName)}"></div>
     ${e.seriesMasterId ? `<p class="hint">As alterações acima valem só para esta ocorrência. <button class="btn sm" data-acao="editarSerie">Editar a série inteira…</button></p>` : ''}`
       : `<p>${fmtData(sd)} ${e.isAllDay ? '(dia todo)' : st + '–' + en}</p>${e.location && e.location.displayName ? `<p>Local: ${esc(e.location.displayName)}</p>` : ''}<p class="hint">Este calendário é só para leitura.</p>`}
-    <p>${join ? `<a href="${esc(join)}" target="_blank">Entrar na reunião online</a> · ` : ''}${e.webLink ? `<a href="${esc(e.webLink)}" target="_blank">Abrir no ${c.fonte === 'google' ? 'Google Agenda' : 'Outlook'}</a>` : ''}</p>
+    ${join ? `<div class="box" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Link:</b> <a href="${esc(join)}" target="_blank" style="word-break:break-all;flex:1">${esc(join)}</a><button class="btn sm" data-copiar="${esc(join)}">Copiar link</button><button class="btn sm" data-convite-ev="1">Copiar convite</button></div>`
+      : (edit ? `<p><button class="btn sm" data-acao="addReuniaoOnline">+ Adicionar link ${c.fonte === 'google' ? 'do Google Meet' : 'do Teams'}</button></p>` : '')}
+    <p>${e.webLink ? `<a href="${esc(e.webLink)}" target="_blank">Abrir no ${c.fonte === 'google' ? 'Google Agenda' : 'Outlook'}</a>` : ''}</p>
     <div class="box"><label class="hint" style="font-weight:600">Vincular a um projeto</label>
       <div style="display:flex;gap:8px;margin-top:6px"><select id="eProj" style="flex:1;border:1px solid #cfd4de;border-radius:8px;padding:6px">${D.areas.map(a => { const ps = D.projetos.filter(p => p.areaId === a.id); return ps.length ? `<optgroup label="${esc(a.nome)}">${ps.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select>
       <button class="btn" data-acao="vincularEv" ${D.projetos.length ? '' : 'disabled'}>Vincular</button></div>
@@ -1336,6 +1348,9 @@ document.addEventListener('click', async ev => {
   const t = ev.target;
   if (suprimirClique) { suprimirClique = false; ev.stopPropagation(); return; }
   const mv = t.closest('[data-mover]'); if (mv) return confirmarMover(mv.dataset.mover);
+  const cp = t.closest('[data-copiar]'); if (cp) { ev.preventDefault(); return copiarTexto(cp.dataset.copiar, 'Link copiado.'); }
+  const cv = t.closest('[data-convite]'); if (cv) { ev.preventDefault(); const it = D.itens.find(i => i.id === cv.dataset.convite); return copiarTexto(textoConvite(it.titulo, it.data, it.hora, it.duracao, it.linkReuniao), 'Convite copiado.'); }
+  const ce = t.closest('[data-convite-ev]'); if (ce) { const e = modalEvento._e, sd = e.start.dateTime.slice(0, 10); return copiarTexto(textoConvite(e.subject, sd, e.isAllDay ? '' : e.start.dateTime.slice(11, 16), hm2min(e.end.dateTime.slice(11, 16)) - hm2min(e.start.dateTime.slice(11, 16)), e.onlineMeeting.joinUrl), 'Convite copiado.'); }
   if (t.matches('#modalBg')) return fecharModal();
   const nav = t.closest('#nav button'); if (nav) return irPara(nav.dataset.v);
   const conc = t.closest('[data-conc]');
@@ -1383,6 +1398,7 @@ document.addEventListener('click', async ev => {
     case 'gEntrar': return gEntrar(!gCfg().ativo);
     case 'gSair': return gSair();
     case 'gDiag': return gDiagnostico();
+    case 'addReuniaoOnline': return adicionarReuniaoOnline();
     case 'editarSerie': return modalSerie(modalEvento._e);
     case 'salvarSerie': return salvarSerie();
     case 'excluirSerie': return excluirSerie();
@@ -1500,6 +1516,32 @@ async function vincularEvento() {
     D.itens.push(it); salvar(); fecharModal(); faixaEventos = ''; render();
     toast(`Vinculado a ${p.nome}.`);
   } catch (er) { toast('Não consegui vincular: ' + er.message, true); }
+}
+
+/* ================= links de reunião ================= */
+async function copiarTexto(txt, msg) {
+  try { await navigator.clipboard.writeText(txt); toast(msg); }
+  catch { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast(msg); }
+}
+function textoConvite(titulo, data, hora, dur, link) {
+  const d = parseYmd(data), quando = `${DIAS_L[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}${hora ? ` · ${hora}–${min2hm(hm2min(hora) + (+dur || 30))}` : ''}`;
+  return `${titulo}\n${quando.charAt(0).toUpperCase() + quando.slice(1)}\n\nLink da reunião: ${link}`;
+}
+async function adicionarReuniaoOnline() {
+  const e = modalEvento._e, c = e._cal;
+  try {
+    if (c.fonte === 'google') {
+      await gapi('PATCH', gEv(c.id, e.rawId) + '?conferenceDataVersion=1', { conferenceData: { createRequest: { requestId: 'jv-' + Date.now(), conferenceSolutionKey: { type: 'hangoutsMeet' } } } });
+      await espera(1200);
+      const r = await gapi('GET', gEv(c.id, e.rawId));
+      if (r.hangoutLink) e.onlineMeeting = { joinUrl: r.hangoutLink };
+    } else {
+      const r = await graph('PATCH', `${calPath(c.id)}/events/${e.id}`, { isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness' });
+      if (r && r.onlineMeeting) e.onlineMeeting = r.onlineMeeting;
+      else { const r2 = await graph('GET', `${calPath(c.id)}/events/${e.id}?$select=onlineMeeting`); if (r2.onlineMeeting) e.onlineMeeting = r2.onlineMeeting; }
+    }
+    if (e.onlineMeeting && e.onlineMeeting.joinUrl) { toast('Link criado.'); modalEvento(e); } else toast('O link ainda está sendo gerado. Atualize em alguns segundos.', true);
+  } catch (x) { toast('Não consegui criar o link: ' + x.message, true); }
 }
 
 /* ================= navegar arrastando para os lados ================= */
