@@ -24,6 +24,16 @@ a{color:var(--accent)}
 #side nav button.on{background:#2b3346;color:#fff;font-weight:600}
 #side .ico{width:18px;text-align:center;opacity:.9}
 #side .grow{flex:1}
+#btnMini{background:none;border:0;color:#8b93a7;font-size:16px;padding:8px;margin-top:6px;border-radius:8px;text-align:center}
+#btnMini:hover{background:#222939;color:#fff}
+body.mini #side{width:58px;padding:12px 6px}
+body.mini #side .tx{display:none}
+body.mini #side h1{margin:4px 0 16px;text-align:center}
+body.mini #side nav button{justify-content:center;padding:10px 0}
+body.mini #side .ico{font-size:17px;width:auto}
+body.mini #outlookStatus{padding:8px 0;text-align:center;background:none}
+body.mini #outlookStatus .det{display:none}
+body.mini #outlookStatus .dot{margin:3px}
 #outlookStatus{font-size:12px;padding:10px 12px;border-radius:8px;background:#1d2332;line-height:1.4}
 #outlookStatus .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
 /* main */
@@ -137,6 +147,9 @@ body.login #nav,body.login #btnNovo,body.login #btnReuniao{display:none}
   body{flex-direction:column}
   #side{width:auto;order:2;flex-direction:row;padding:4px 6px;border-top:1px solid #2b3346}
   #side h1,#side .grow,#outlookStatus{display:none}
+  body.mini #side{width:auto;padding:4px 6px}
+  #btnMini{display:none}
+  body.mini #side nav button{padding:6px 4px}
   #side nav{display:flex;width:100%;justify-content:space-around}
   #side nav button{flex-direction:column;gap:1px;font-size:10.5px;padding:6px 4px;width:auto;margin:0}
   #main{order:1;min-height:0}
@@ -154,16 +167,17 @@ table.cfg td{padding:6px 4px;border-bottom:1px solid #f0f1f4;vertical-align:midd
 </head>
 <body>
 <aside id="side">
-  <h1>✔ Meus Afazeres</h1>
+  <h1><span>✔</span><span class="tx"> Meus Afazeres</span></h1>
   <nav id="nav">
-    <button data-v="hoje"><span class="ico">☀</span>Hoje</button>
-    <button data-v="semana"><span class="ico">▤</span>Semana</button>
-    <button data-v="calendario"><span class="ico">▦</span>Calendário</button>
-    <button data-v="projetos"><span class="ico">◧</span>Empresas e projetos</button>
-    <button data-v="config"><span class="ico">⚙</span>Configurações</button>
+    <button data-v="hoje" title="Hoje"><span class="ico">☀</span><span class="tx">Hoje</span></button>
+    <button data-v="semana" title="Semana"><span class="ico">▤</span><span class="tx">Semana</span></button>
+    <button data-v="calendario" title="Calendário"><span class="ico">▦</span><span class="tx">Calendário</span></button>
+    <button data-v="projetos" title="Empresas e projetos"><span class="ico">◧</span><span class="tx">Empresas e projetos</span></button>
+    <button data-v="config" title="Configurações"><span class="ico">⚙</span><span class="tx">Configurações</span></button>
   </nav>
   <div class="grow"></div>
   <div id="outlookStatus"></div>
+  <button id="btnMini" title="Expandir/recolher menu">»</button>
 </aside>
 <div id="main">
   <div id="top">
@@ -873,7 +887,7 @@ function linha(x, opts = {}) {
 }
 
 /* ================= views ================= */
-let vista = 'hoje', refSemana = domingo(hoje0()), refCal = hoje0(), modoCal = 'semana', selProj = null;
+let vista = 'calendario', refSemana = domingo(hoje0()), refCal = hoje0(), modoCal = 'semana', selProj = null;
 const TITULOS = { hoje: 'Hoje', semana: 'Semana', calendario: 'Calendário', projetos: 'Empresas e projetos', config: 'Configurações' };
 function irPara(v) { vista = v; render(); }
 function render() {
@@ -903,9 +917,15 @@ function renderFiltros() {
 }
 function renderStatus() {
   const el = $('#outlookStatus');
-  if (conectado()) el.innerHTML = `<span class="dot" style="background:#22c55e"></span>Outlook conectado<br><span style="opacity:.7">${esc(conta.username)}</span>` + (erroOutlook ? `<br><span style="color:#fca5a5">${esc(erroOutlook)}</span>` : '');
-  else el.innerHTML = `<span class="dot" style="background:#f59e0b"></span>Outlook desconectado<br><button class="btn sm" style="margin-top:6px" data-acao="entrar">Conectar Outlook</button>`;
-  if (gCfg().ativo) el.innerHTML += `<div style="margin-top:8px"><span class="dot" style="background:${gOk() ? '#22c55e' : '#f59e0b'}"></span>Google ${gOk() ? 'conectado' : '— clique para renovar'}<br><span style="opacity:.7">${esc(gCfg().email)}</span>${erroGoogle ? `<br><span style="color:#fca5a5">${esc(erroGoogle)}</span>` : ''}</div>`;
+  const g = gCfg().ativo;
+  const dO = `<span class="dot" title="Outlook ${conectado() ? 'conectado' : 'desconectado'}" style="background:${conectado() ? '#22c55e' : '#f59e0b'}"></span>`;
+  const dG = g ? `<span class="dot" title="Google ${gOk() ? 'conectado' : '— clique para renovar'}" style="background:${gOk() ? '#22c55e' : '#f59e0b'}"></span>` : '';
+  if (document.body.classList.contains('mini')) { el.innerHTML = dO + dG; return; }
+  let h = conectado()
+    ? `${dO}Outlook conectado<div class="det" style="opacity:.7">${esc(conta.username)}</div>` + (erroOutlook ? `<div class="det" style="color:#fca5a5">${esc(erroOutlook)}</div>` : '')
+    : `${dO}Outlook desconectado<div class="det"><button class="btn sm" style="margin-top:6px" data-acao="entrar">Conectar Outlook</button></div>`;
+  if (g) h += `<div style="margin-top:8px">${dG}Google ${gOk() ? 'conectado' : '— clique para renovar'}<div class="det" style="opacity:.7">${esc(gCfg().email)}</div>${erroGoogle ? `<div class="det" style="color:#fca5a5">${esc(erroGoogle)}</div>` : ''}</div>`;
+  el.innerHTML = h;
 }
 
 function vHoje() {
@@ -1410,6 +1430,9 @@ document.addEventListener('change', ev => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(); });
 $('#btnNovo').onclick = () => novoItem();
+function aplicarMini(m) { document.body.classList.toggle('mini', m); $('#btnMini').textContent = m ? '»' : '«'; try { localStorage.setItem('menuMini', m ? '1' : '0'); } catch { } if (D) renderStatus(); }
+$('#btnMini').onclick = () => aplicarMini(!document.body.classList.contains('mini'));
+aplicarMini((() => { try { return localStorage.getItem('menuMini') !== '0'; } catch { return true; } })());
 $('#btnReuniao').onclick = () => novoItem({ tipo: 'reuniao' });
 
 /* ================= vincular eventos existentes ================= */
