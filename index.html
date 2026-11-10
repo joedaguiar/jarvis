@@ -80,6 +80,11 @@ body.mini #outlookStatus .dot{margin:3px}
 .row.done .t{text-decoration:line-through;color:var(--muted)}
 .chk{width:18px;height:18px;flex:none;accent-color:var(--salvia);cursor:pointer}
 .tag{font-size:11px;border-radius:6px;padding:1px 7px;background:#ece7de;color:#5c6870;margin-left:6px;white-space:nowrap;font-weight:600}
+.evo{font-weight:500;opacity:.82;white-space:nowrap}
+.evo i{display:inline-block;width:3px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.ev .evo i{display:none}
+.ev .evm{font-size:10.5px;opacity:.85;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.ev .evt{font-weight:600}
 .otag{display:inline;font-size:10px;font-weight:700;padding:0 7px 0 5px;border-radius:999px;margin:1px 5px 1px 1px;line-height:15px;vertical-align:1px;white-space:nowrap;letter-spacing:.1px}
 .otag i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:1px}
 .tag.ol{background:var(--accent-soft);color:var(--salvia-esc)}
@@ -666,7 +671,7 @@ const ehReuniao = e => !!(e.isOnlineMeeting || (e.attendees && e.attendees.lengt
 function corEvento(e, base) {
   if (e.categories && e.categories.length && categorias) { const c = e.categories.map(n => categorias[n]).find(Boolean); if (c) return c; }
   if (e.gColor && GCORES[e.gColor]) return GCORES[e.gColor];
-  if (e._cal.padrao && ehReuniao(e)) return clarear(base, D.config.estiloEventos === 'claro' ? 0.28 : 0.4);
+  if (e._cal.padrao && ehReuniao(e)) return clarear(base, estiloEv() === 'solido' ? 0.4 : 0.28);
   return base;
 }
 const SHOWAS = { free: 'Livre', tentative: 'Provisório', busy: 'Ocupado', oof: 'Ausência temporária', workingElsewhere: 'Trabalhando em outro lugar' };
@@ -675,8 +680,18 @@ function escurecer(hex, f) {
   const n = parseInt(m[1], 16); return '#' + [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * (1 - f)).toString(16).padStart(2, '0')).join('');
 }
 // eventos com fundo claro da cor da agenda + filete forte à esquerda: texto escuro e legível
+const estiloEv = () => (D && D.config.estiloEventos) || 'pastel';
 function estiloSA(sa, cor) {
-  if ((D && D.config.estiloEventos) !== 'claro') {
+  if (estiloEv() === 'pastel') {
+    // tons pastel: fundo claro e suave da cor da agenda, texto no tom escuro dela
+    const bg = clarear(cor, .6), txt = escurecer(cor, .6);
+    if (sa === 'tentative') return `background:repeating-linear-gradient(135deg,${bg} 0 6px,${clarear(cor, .82)} 6px 12px);color:${txt};`;
+    if (sa === 'free') return `background:#fffdf9;border:1px solid ${clarear(cor, .45)};color:${txt};`;
+    if (sa === 'oof') return `background:${clarear('#7c5aa6', .62)};color:#3b2a57;`;
+    if (sa === 'workingElsewhere') return `background:${bg};border:1px dashed ${clarear(cor, .3)};color:${txt};`;
+    return `background:${bg};color:${txt};`;
+  }
+  if (estiloEv() === 'solido') {
     // cor forte com texto branco (estilo original)
     if (sa === 'tentative') return `background:repeating-linear-gradient(135deg,${cor} 0 6px,${clarear(cor, .4)} 6px 12px);color:#fff;text-shadow:0 0 3px rgba(0,0,0,.5);`;
     if (sa === 'free') return `background:#fff;border:1px solid ${cor};border-left:3px solid ${cor};color:${escurecer(cor, .45)};`;
@@ -1214,7 +1229,9 @@ function vCalendario() {
       const s = Math.min(Math.max(hm2min(x.hora), H0 * 60), H1 * 60 - 20), e = Math.max(Math.min(hm2min(x.fim || x.hora) || s + 30, H1 * 60), s + 20);
       const top = (s - H0 * 60) / 60 * PX, h = (e - s) / 60 * PX - 2;
       const movel = x.k === 'item' ? !x.it.leitura : (x.e._cal.podeEditar && !x.e.isAllDay);
-      return `<div class="ev ${x.feito ? 'done' : ''} ${movel ? 'movel' : ''} ${h < PX * 1.3 ? 'curto' : ''}" title="${esc(x.titulo + (x.sa && SHOWAS[x.sa] ? ' · ' + SHOWAS[x.sa] : ''))}" style="top:${top}px;height:${h}px;left:calc(${x._c / x._n * 100}% + 1px);width:calc(${100 / x._n}% - 3px);${estiloSA(x.sa, x.cor)}" ${x.k === 'item' ? `data-item="${x.it.id}" data-orig="${x.orig}"` : `data-ev="${esc(x.e.id)}"`} data-ini="${hm2min(x.hora)}" data-dur="${hm2min(x.fim || x.hora) - hm2min(x.hora)}" data-dia="${x.data}"><b>${x.hora}</b> ${tituloHtml(x)}${movel ? '<div class="rs"></div>' : ''}</div>`;
+      return `<div class="ev ${x.feito ? 'done' : ''} ${movel ? 'movel' : ''} ${h < PX * 1.3 ? 'curto' : ''}" title="${esc(x.titulo + (x.sa && SHOWAS[x.sa] ? ' · ' + SHOWAS[x.sa] : ''))}" style="top:${top}px;height:${h}px;left:calc(${x._c / x._n * 100}% + 1px);width:calc(${100 / x._n}% - 3px);${estiloSA(x.sa, x.cor)}${(() => { const pe = partesEntrada(x); return pe ? `box-shadow:inset 5px 0 0 ${pe.faixa};padding-left:10px;` : ''; })()}" ${x.k === 'item' ? `data-item="${x.it.id}" data-orig="${x.orig}"` : `data-ev="${esc(x.e.id)}"`} data-ini="${hm2min(x.hora)}" data-dur="${hm2min(x.fim || x.hora) - hm2min(x.hora)}" data-dia="${x.data}">${(() => { const pe = partesEntrada(x), curto = h < PX * 1.3;
+        if (!pe) return `<b>${x.hora}</b> ${esc(x.titulo)}`;
+        return curto ? `<b>${x.hora}</b> <span class="evo">${esc(pe.obra)} ·</span> ${esc(pe.titulo)}` : `<div class="evm">${x.hora} · ${esc(pe.obra)}</div><div class="evt">${esc(pe.titulo)}</div>`; })()}${movel ? '<div class="rs"></div>' : ''}</div>`;
     }).join('')}${d === hs ? `<div class="nowline" id="nowline"></div>` : ''}</div>`;
   }
   return head.replace('<span class="lbl" id="calLbl"></span>', `<span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span>`) + g + '</div>';
@@ -1337,8 +1354,9 @@ function vConfig() {
     </div></div><div>
     <div class="card"><h3>Calendários exibidos</h3>${cals}<p class="hint">Agendas com o mesmo <b>grupo</b> aparecem como uma só no filtro do topo.</p></div>
     <div class="card"><h3>Aparência dos eventos</h3>
-      <label class="cb"><input type="radio" name="estEv" value="solido" ${D.config.estiloEventos !== 'claro' ? 'checked' : ''}> Cor forte, texto branco</label>
-      <label class="cb"><input type="radio" name="estEv" value="claro" ${D.config.estiloEventos === 'claro' ? 'checked' : ''}> Fundo claro com filete colorido, texto escuro</label></div>
+      <label class="cb"><input type="radio" name="estEv" value="pastel" ${estiloEv() === 'pastel' ? 'checked' : ''}> Tons pastel, faixa da obra à esquerda</label>
+      <label class="cb"><input type="radio" name="estEv" value="solido" ${estiloEv() === 'solido' ? 'checked' : ''}> Cor forte, texto branco</label>
+      <label class="cb"><input type="radio" name="estEv" value="claro" ${estiloEv() === 'claro' ? 'checked' : ''}> Fundo claro com filete colorido, texto escuro</label></div>
     <div class="card"><h3>Lembretes</h3>
       <div class="f"><label>Lembrete padrão (minutos antes)</label><input type="number" id="cfgLemb" min="0" value="${c.lembretePadrao}"></div>
       <label class="cb"><input type="checkbox" id="cfgNotif" ${c.notificacoes ? 'checked' : ''}> Notificações do Windows para itens que não estão no Outlook</label>
@@ -2072,11 +2090,17 @@ function projetoDaEntrada(x) {
   if (x.k === 'ev') { const r = projetoDoTexto(x.e.subject); return r ? r.p : null; }
   return null;
 }
-function tituloHtml(x) {
-  const p = projetoDaEntrada(x);
-  if (!p) return esc(x.titulo);
+function partesEntrada(x) {
+  const p = projetoDaEntrada(x); if (!p) return null;
   const t = x.k === 'ev' || (x.it && x.it.vinculado) ? tituloLimpo(x.titulo, p) : x.titulo.replace(' — ' + p.nome, '');
-  return tagHtml(p) + esc(t);
+  const tg = tagProjeto(p);
+  return { p, obra: tg.nome, cor: tg.cor, faixa: estiloEv() === 'solido' ? tg.cor : clarear(tg.cor, .3), titulo: t || x.titulo };
+}
+// nas listas: nome da obra discreto, com um filete da cor da construtora
+function tituloHtml(x) {
+  const pe = partesEntrada(x);
+  if (!pe) return esc(x.titulo);
+  return `<span class="evo"><i style="background:${pe.faixa}"></i>${esc(pe.obra)} ·</span> ${esc(pe.titulo)}`;
 }
 
 /* ================= demandas rápidas ================= */
