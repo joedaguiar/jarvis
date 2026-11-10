@@ -122,8 +122,9 @@ body.mini #outlookStatus .dot{margin:3px}
 
 /* tarefas */
 .tfiltros{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px}
-.tfiltros input,.tfiltros select{border:1px solid var(--areia);border-radius:10px;padding:7px 10px;background:#fff}
-.tfiltros input{min-width:220px}
+.tfiltros #tfQ,.tfiltros select{border:1px solid var(--areia);border-radius:10px;padding:7px 10px;background:#fff}
+.tfiltros #tfQ{min-width:220px}
+.tfiltros .cb{white-space:nowrap}
 .quadro{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:12px;align-items:start;overflow-x:auto;padding-bottom:6px}
 .qcol{background:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.6);border-radius:18px;padding:10px;min-height:120px}
 .qcol h3{display:flex;justify-content:space-between;align-items:center;margin:2px 4px 10px;font-size:14px;font-weight:700}
@@ -250,7 +251,7 @@ body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemand
   .ev{font-size:10.5px;padding:2px 3px}
   .wk .hd .dn{font-size:16px}
   .row .time{width:74px;font-size:12px}
-  .tfiltros input{min-width:0;flex:1}
+  .tfiltros #tfQ{min-width:0;flex:1}
   #modalBg{padding:10px}
 }
 </style>
@@ -1074,7 +1075,7 @@ function vPainel() {
     const pend = pc.filter(x => x.p.id === p.id).length + atr.filter(x => x.it.projetoId === p.id).length;
     const reun = D.itens.filter(i => i.projetoId === p.id && i.tipo === 'reuniao' && i.data >= hs).sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora))[0];
     return { p, prox: t[0], pend, reun };
-  });
+  }).filter(o => o.pend || o.prox || o.reun).sort((a, b) => b.pend - a.pend || (a.prox ? a.prox.data : '9').localeCompare(b.prox ? b.prox.data : '9')).slice(0, 8);
   const tile = (n, rot, cls) => `<div class="kpi ${cls || ''}"><b>${n}</b><span>${rot}</span></div>`;
   return `<div class="painel">
     <section class="ola card">
@@ -1101,7 +1102,7 @@ function vPainel() {
       <section class="card"><h3>Próximas entregas</h3>${prox.length ? prox.map(x => linha(x, { dataNaLinha: true })).join('') : '<div class="empty">Nenhuma entrega nos próximos 14 dias.</div>'}</section>
     </div></div>`;
 }
-let tFiltro = { proj: '', cat: '', q: '', rotinas: true };
+let tFiltro = { proj: '', cat: '', q: '', rotinas: false };
 function vTarefas() {
   const h = hoje0(), hs = ymd(h), fim = addDays(h, 7);
   const cards = [];
@@ -1115,7 +1116,8 @@ function vTarefas() {
   const pid = c => c.k === 'ctl' ? c.p.id : c.it.projetoId, cat = c => { const p = projeto(pid(c)); return p ? p.categoria || '' : ''; };
   const q = tFiltro.q.trim().toLowerCase();
   cards.sort((a, b) => (a.data || '9').localeCompare(b.data || '9') || ((a.k === 'item' && a.it.hora) || '').localeCompare((b.k === 'item' && b.it.hora) || ''));
-  const vis = cards.filter(c => (tFiltro.rotinas || !(c.k === 'item' && c.it.recorrencia)) && (!tFiltro.proj || pid(c) === tFiltro.proj) && (!tFiltro.cat || cat(c) === tFiltro.cat) && (!q || c.titulo.toLowerCase().includes(q)));
+  const ehExec = c => c.k === 'ctl' || (c.it.projetoId && projeto(c.it.projetoId) && (projeto(c.it.projetoId).categoria !== 'pessoal' || !c.it.recorrencia));
+  const vis = cards.filter(c => (tFiltro.rotinas || ehExec(c)) && (!tFiltro.proj || pid(c) === tFiltro.proj) && (!tFiltro.cat || cat(c) === tFiltro.cat) && (!q || c.titulo.toLowerCase().includes(q)));
   const colunas = [
     ['Atrasadas', vis.filter(c => !c.feito && c.data && c.data < hs), 'alerta'],
     ['Hoje', vis.filter(c => !c.feito && c.data === hs), 'hoje'],
@@ -1135,7 +1137,7 @@ function vTarefas() {
       <input id="tfQ" placeholder="Buscar tarefa…" value="${esc(tFiltro.q)}">
       <select id="tfProj"><option value="">Todos os projetos</option>${optsProjetos(tFiltro.proj)}</select>
       <select id="tfCat"><option value="">Todas as categorias</option>${Object.entries(CATEGORIAS).map(([k, c]) => `<option value="${k}" ${tFiltro.cat === k ? 'selected' : ''}>${c.nome}</option>`).join('')}</select>
-      <label class="cb" style="margin:0"><input type="checkbox" id="tfRot" ${tFiltro.rotinas ? 'checked' : ''}> Mostrar rotinas</label>
+      <label class="cb" style="margin:0"><input type="checkbox" id="tfRot" ${tFiltro.rotinas ? 'checked' : ''}> Mostrar também rotinas pessoais e itens sem projeto</label>
       <span class="hint" style="margin-left:auto">${vis.filter(c => !c.feito).length} em aberto</span></div>
     <div class="quadro">${colunas.map(([t, l, cls]) => `<section class="qcol ${cls}"><h3>${t}<span>${l.length}</span></h3>${l.map(card).join('') || '<div class="empty">Nada aqui.</div>'}</section>`).join('')}</div>`;
 }
@@ -1250,7 +1252,7 @@ function vProjetos() {
       <div class="hint">${ps.length} projeto(s) · itens desta empresa sem projeto específico aparecem abaixo.</div></div>
       ${ps.length ? `<div class="card"><h3>Projetos</h3>${ps.map(p => {
         const its = D.itens.filter(i => i.projetoId === p.id), prox = its.map(proximaOcorrencia).filter(Boolean).sort()[0];
-        return `<div class="row"><div class="bar" style="background:${a.cor}"></div><div class="txt" data-selproj="${p.id}"><div class="t">${esc(p.nome)} <span class="tag">${p.tipo === 'obra' ? 'Obra' : 'Projeto'}</span></div><div class="s">${its.length} item(ns)${prox ? ' · próximo: ' + fmtData(prox) : ''}</div></div></div>`;
+        return `<div class="row"><div class="bar" style="background:${a.cor}"></div><div class="txt" data-selproj="${p.id}"><div class="t">${esc(p.nome)} <span class="tag">${p.tipo === 'obra' ? 'Obra' : 'Projeto'}</span>${CATEGORIAS[p.categoria] ? `<span class="tag ol">${CATEGORIAS[p.categoria].nome}</span>` : ''}</div><div class="s">${its.length} item(ns)${prox ? ' · próximo: ' + fmtData(prox) : ''}</div></div></div>`;
       }).join('')}</div>` : ''}
       ${secoesItens(itens, { areaId: a.id })}`;
   } else {
@@ -1932,6 +1934,39 @@ function garantirPessoal() {
   salvar();
 }
 
+// cadastro inicial dos projetos (roda uma vez; não duplica nem apaga o que já existe)
+const PROJETOS_INICIAIS = {
+  'R. Nunes': [['DGO - Copa Studios', 'sienge_semanal'], ['DSM - Nereida', ''], ['EW - Easy', ''], ['EW - EW Tower', ''], ['Ferreira - Downtown', 'sienge_semanal'],
+    ['Geromel - Portal Di Mônaco', ''], ['Geromel - Studios Claret', ''], ['Hugo Fabbri - City Club', 'sienge_semanal'], ['Hugo Fabbri - Matiz', 'sienge_semanal'],
+    ['RH - Dom Aloysio', ''], ['Russi & Russi - Renovaccio', 'sienge_mensal'], ['Russi & Russi - Venice', 'sienge_mensal'], ['Russi & Russi - Positano', 'sienge_mensal'],
+    ['S Figueiredo - Mário Martins', 'sienge_mensal'], ['TAP - Villa Montese', ''], ['Volume - Aura', '']],
+  'JF': [['Residência GB', ''], ['Residência MS', ''], ['Residência RD', ''], ['Desenvolvimento Sistema', '', 'projeto']],
+  'SIGO': [['Consultoria Magi', '', 'projeto']]
+};
+function migrarProjetos() {
+  if ((D.config.migracao || 0) >= 1) return;
+  const norm = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const desde = ymd(segundaDe(hoje0()));
+  // área SIGO: aproveita a antiga "Magi" se ela ainda não tiver projetos
+  if (!D.areas.some(a => norm(a.nome) === 'sigo')) {
+    const magi = D.areas.find(a => norm(a.nome) === 'magi' && !D.projetos.some(p => p.areaId === a.id));
+    if (magi) magi.nome = 'SIGO'; else D.areas.push({ id: uid(), nome: 'SIGO', cor: '#9333ea', calendarioId: '' });
+  }
+  // remove a obra de exemplo e as rotinas de exemplo que nunca foram para a agenda
+  const ex = D.projetos.find(p => /obra exemplo/i.test(p.nome));
+  if (ex) { D.itens = D.itens.filter(i => !(i.projetoId === ex.id && !i.outlook)); D.projetos = D.projetos.filter(p => p !== ex); }
+  D.itens = D.itens.filter(i => !(['Academia', 'Almoço'].includes(i.titulo) && !i.projetoId && !i.outlook && i.recorrencia));
+  Object.entries(PROJETOS_INICIAIS).forEach(([an, lista]) => {
+    let a = D.areas.find(x => norm(x.nome) === norm(an));
+    if (!a) { a = { id: uid(), nome: an, cor: CORES[D.areas.length % CORES.length], calendarioId: '' }; D.areas.push(a); }
+    lista.forEach(([nome, cat, tipo]) => {
+      if (D.projetos.some(p => norm(p.nome) === norm(nome))) return;
+      D.projetos.push({ id: uid(), areaId: a.id, nome, tipo: tipo || 'obra', descricao: '', categoria: cat, uf: D.config.ufPadrao || 'RJ', local: '', controleDesde: desde });
+    });
+  });
+  D.config.migracao = 1; salvar();
+}
+
 /* ================= demandas rápidas ================= */
 function optsProjetos(sel) {
   return D.areas.map(a => { const ps = D.projetos.filter(p => p.areaId === a.id); return ps.length ? `<optgroup label="${esc(a.nome)}">${ps.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</optgroup>` : ''; }).join('');
@@ -2339,6 +2374,7 @@ function telaLogin(msg) {
   catch (e) { return telaLogin('Não consegui ler seus dados no OneDrive: ' + e.message); }
   document.body.classList.remove('login');
   garantirPessoal();
+  migrarProjetos();
   gRestaurar();
   render();
   if (gOk()) gCarregarCalendarios().then(() => { faixaEventos = ''; render(); }).catch(e => { erroGoogle = e.message; });
