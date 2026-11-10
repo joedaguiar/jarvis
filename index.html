@@ -583,7 +583,7 @@ const ehReuniao = e => !!(e.isOnlineMeeting || (e.attendees && e.attendees.lengt
 function corEvento(e, base) {
   if (e.categories && e.categories.length && categorias) { const c = e.categories.map(n => categorias[n]).find(Boolean); if (c) return c; }
   if (e.gColor && GCORES[e.gColor]) return GCORES[e.gColor];
-  if (e._cal.padrao && ehReuniao(e)) return clarear(base, 0.28);
+  if (e._cal.padrao && ehReuniao(e)) return clarear(base, D.config.estiloEventos === 'claro' ? 0.28 : 0.4);
   return base;
 }
 const SHOWAS = { free: 'Livre', tentative: 'Provisório', busy: 'Ocupado', oof: 'Ausência temporária', workingElsewhere: 'Trabalhando em outro lugar' };
