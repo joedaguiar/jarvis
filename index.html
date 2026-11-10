@@ -222,6 +222,9 @@ body.arrastando,body.arrastando *{user-select:none!important}
 .f input,.f select,.f textarea{border:1px solid var(--areia);border-radius:10px;padding:8px 10px;background:#fff}
 .f input:focus,.f select:focus,.f textarea:focus{border-color:var(--salvia);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
 .f textarea{min-height:70px;resize:vertical}
+.f>div,.f select,.f input{min-width:0;max-width:100%}
+.f>div>select,.f>div>input{width:100%}
+.f>div>input[type=time]{width:120px;flex:none}
 .fr{display:flex;gap:12px;flex-wrap:wrap}
 .fr>.f{flex:1;min-width:130px}
 .dows{display:flex;gap:4px}
@@ -267,6 +270,7 @@ body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemand
   .row .time{width:74px;font-size:12px}
   .tfiltros #tfQ{min-width:0;flex:1}
   #modalBg{padding:10px}
+  #modal .fr>.f{min-width:100%}
 }
 </style>
 </head>
@@ -2142,6 +2146,8 @@ function modalDemanda(it, pid) {
   const sw = () => { $('#dCalSw').style.background = corDoCal($('#dCal').value) || '#64748b'; };
   $('#dProj').addEventListener('change', () => { if (!it) { $('#dCal').value = calPadraoProjeto($('#dProj').value); sw(); } });
   $('#dCal').addEventListener('change', sw);
+  const avisoVis = () => { const tem = !!$('#dLembD').value; $('#dAviso').closest('.box').style.display = tem ? '' : 'none'; };
+  $('#dLembD').addEventListener('input', avisoVis); $('#dLembD').addEventListener('change', avisoVis); avisoVis();
   setTimeout(() => $('#dTit').focus(), 30);
 }
 async function salvarDemanda() {
