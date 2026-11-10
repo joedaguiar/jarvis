@@ -162,6 +162,8 @@ body.mini #outlookStatus .dot{margin:3px}
 .wk .hd.hoje .dw{color:var(--coral)}
 .wk .ad{min-width:0;overflow:hidden;border-bottom:1px solid var(--linha);min-height:34px;padding:3px;border-left:1px solid var(--line-2)}
 .wk .hrs{position:relative}
+.wk .hr:first-child{transform:translateY(2px)}
+.wk .hd .adchip{width:100%;margin-top:3px;text-align:left}
 .wk .hr{height:var(--px,48px);font-size:11px;color:var(--muted);text-align:right;padding-right:6px;transform:translateY(-7px);font-variant-numeric:tabular-nums}
 .wk .col{position:relative;border-left:1px solid var(--line-2);background:repeating-linear-gradient(transparent 0 calc(var(--px,48px) - 1px),var(--line-2) calc(var(--px,48px) - 1px) var(--px,48px))}
 .wk .col.hoje{background:repeating-linear-gradient(rgba(232,105,63,.05) 0 calc(var(--px,48px) - 1px),#f1e2d9 calc(var(--px,48px) - 1px) var(--px,48px))}
@@ -1163,12 +1165,12 @@ function vSemana() {
   return html + '</div>';
 }
 
-const H0 = 6, H1 = 21; let PX = 40; // altura de 1 hora; ajustada para caber das 6h às 21h na tela
+const H0 = 8, H1 = 21; let PX = 40; // altura de 1 hora; ajustada para caber das 8h às 21h na tela
 function colunasSemana(ini, ent, prefixo) {
   const cols = [];
   for (let i = 0; i < 7; i++) {
     const dd = addDays(ini, i), d = ymd(dd), fds = dd.getDay() === 0 || dd.getDay() === 6;
-    cols.push(fds && !ent.some(x => x.data === d) ? 'minmax(0,.35fr)' : 'minmax(0,1fr)');
+    cols.push(fds ? (ent.some(x => x.data === d) ? 'minmax(0,.55fr)' : 'minmax(0,.2fr)') : 'minmax(0,1fr)');
   }
   return (prefixo ? prefixo + ' ' : '') + cols.join(' ');
 }
@@ -1195,16 +1197,14 @@ function vCalendario() {
   carregarEventos(ini, fim);
   const ent = entradas(ini, fim);
   let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent, '52px')};--px:${PX}px"><div class="hd"></div>`;
-  for (let i = 0; i < 7; i++) { const dd = addDays(ini, i); g += `<div class="hd ${ymd(dd) === hs ? 'hoje' : ''}"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span></div>`; }
-  g += `<div class="ad" style="border-left:0;font-size:10px;color:var(--muted);padding-top:6px;text-align:right"><span class="adtx">dia todo</span></div>`;
   for (let i = 0; i < 7; i++) {
-    const d = ymd(addDays(ini, i));
-    g += `<div class="ad">${ent.filter(x => x.data === d && !x.hora).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${tituloHtml(x)}</div>`).join('')}</div>`;
+    const dd = addDays(ini, i), d = ymd(dd), dt = ent.filter(x => x.data === d && !x.hora);
+    g += `<div class="hd ${d === hs ? 'hoje' : ''}"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${dt.map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc(x.titulo)}">${tituloHtml(x)}</div>`).join('')}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i));
-    const evs = layout(ent.filter(x => x.data === d && x.hora));
+    const evs = layout(ent.filter(x => x.data === d && x.hora && hm2min(x.hora) < H1 * 60 && Math.max(hm2min(x.fim || x.hora), hm2min(x.hora) + 20) > H0 * 60));
     g += `<div class="col ${d === hs ? 'hoje' : ''}" data-coldia="${d}" style="height:${(H1 - H0) * PX}px">${evs.map(x => {
       const s = Math.min(Math.max(hm2min(x.hora), H0 * 60), H1 * 60 - 20), e = Math.max(Math.min(hm2min(x.fim || x.hora) || s + 30, H1 * 60), s + 20);
       const top = (s - H0 * 60) / 60 * PX, h = (e - s) / 60 * PX - 2;
@@ -1989,6 +1989,15 @@ function migrarCores() {
   const magi = D.projetos.find(p => norm(p.nome) === 'consultoriamagi'); if (magi && !magi.apelidos) magi.apelidos = 'Magi';
   D.config.migracao = 2; salvar();
 }
+function repararVinculos() {
+  let mud = false;
+  D.itens.forEach(it => {
+    if (it.projetoId && !projeto(it.projetoId)) {
+      const r = projetoDoTexto(it.titulo); it.projetoId = r ? r.p.id : ''; if (r) it.areaId = r.p.areaId; mud = true;
+    }
+  });
+  if (mud) salvar();
+}
 
 /* ================= etiquetas de obra e vínculo automático pelo nome ================= */
 const CORES_CONSTRUTORA = { 'ferreira': '#dc2626', 'hugo fabbri': '#16a34a', 'dgo': '#2563eb', 'geromel': '#eab308', 's figueiredo': '#2563eb', 'volume': '#16a34a', 'rh': '#f97316', 'ew': '#eab308', 'dsm': '#2563eb', 'russi russi': '#9333ea', 'tap': '#9333ea' };
@@ -2051,7 +2060,10 @@ function tituloLimpo(txt, p) {
   return low.charAt(0).toLocaleUpperCase('pt-BR') + low.slice(1);
 }
 function projetoDaEntrada(x) {
-  if (x.k === 'item') { const p = projeto(x.it.projetoId); return p && p.categoria !== 'pessoal' ? p : null; }
+  if (x.k === 'item') {
+    const p = projeto(x.it.projetoId); if (p && p.categoria !== 'pessoal') return p;
+    const r = projetoDoTexto((x.ev && x.ev.subject) || x.titulo); return r ? r.p : null;
+  }
   if (x.k === 'ev') { const r = projetoDoTexto(x.e.subject); return r ? r.p : null; }
   return null;
 }
@@ -2471,6 +2483,7 @@ function telaLogin(msg) {
   garantirPessoal();
   migrarProjetos();
   migrarCores();
+  repararVinculos();
   gRestaurar();
   render();
   if (gOk()) gCarregarCalendarios().then(() => { faixaEventos = ''; render(); }).catch(e => { erroGoogle = e.message; });
