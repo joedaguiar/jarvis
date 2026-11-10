@@ -728,13 +728,22 @@ function recorrenciaGraph(it, inicio) {
   else pattern = { type: 'absoluteMonthly', interval: iv, dayOfMonth: +r.diaMes || parseYmd(inicio).getDate() };
   return { pattern, range: r.ate ? { type: 'endDate', startDate: inicio, endDate: r.ate } : { type: 'noEnd', startDate: inicio } };
 }
+// título do evento na agenda: "Construtora - Serviço Obra" (ex.: "Geromel - Cronograma Studios Claret")
+function tituloAgenda(it) {
+  const p = projeto(it.projetoId);
+  if (!p || p.categoria === 'pessoal') return it.titulo;
+  const pt = partesProjeto(p), obra = (p.tag || pt.obra);
+  let serv = it.titulo;
+  if (normTxt(serv).includes(normTxt(obra))) serv = tituloLimpo(serv, p) || serv;
+  return (pt.construtora ? pt.construtora + ' - ' : '') + serv + ' ' + obra;
+}
 function payloadEvento(it) {
   const ini = primeiraOcorrencia(it) || ymd(hoje0());
   const p = projeto(it.projetoId), a = area(it.areaId);
   const ev = {
-    subject: it.titulo + (p ? ` — ${p.nome}` : ''),
+    subject: tituloAgenda(it),
     body: { contentType: 'text', content: (it.notas ? it.notas + '\n\n' : '') + `[Meus Afazeres] ${a ? a.nome : ''}${p ? ' / ' + p.nome : ''}` },
-    categories: a ? [a.nome] : [],
+    categories: [],
     isReminderOn: +it.lembrete >= 0,
     reminderMinutesBeforeStart: Math.max(0, +it.lembrete || 0),
     showAs: it.showAs || 'busy',
@@ -897,7 +906,7 @@ function gRrule(it) {
 function payloadGoogle(it) {
   const ini = primeiraOcorrencia(it) || ymd(hoje0()), p = projeto(it.projetoId), a = area(it.areaId);
   const ev = {
-    summary: it.titulo + (p ? ` — ${p.nome}` : ''),
+    summary: tituloAgenda(it),
     description: (it.notas ? it.notas + '\n\n' : '') + `[Meus Afazeres] ${a ? a.nome : ''}${p ? ' / ' + p.nome : ''}`,
     location: it.local || '',
     reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: Math.max(0, +it.lembrete || 0) }] },
@@ -2099,7 +2108,7 @@ function projetoDaEntrada(x) {
 }
 function partesEntrada(x) {
   const p = projetoDaEntrada(x); if (!p) return null;
-  const t = x.k === 'ev' || (x.it && x.it.vinculado) ? tituloLimpo(x.titulo, p) : x.titulo.replace(' — ' + p.nome, '');
+  const t = x.k === 'ev' || (x.it && x.it.vinculado) ? tituloLimpo(x.titulo, p) : (tituloLimpo(x.titulo.replace(' — ' + p.nome, ''), p) || x.titulo);
   const tg = tagProjeto(p);
   return { p, obra: tg.nome, cor: tg.cor, faixa: clarear(tg.cor, .35), titulo: t || x.titulo };
 }
@@ -2525,7 +2534,16 @@ function telaLogin(msg) {
   gRestaurar();
   render();
   if (gOk()) gCarregarCalendarios().then(() => { faixaEventos = ''; render(); }).catch(e => { erroGoogle = e.message; });
-  carregarCalendarios().then(() => { sincronizarPendentes(); render(); }).catch(e => { erroOutlook = e.message; render(); });
+  carregarCalendarios().then(async () => {
+    await sincronizarPendentes();
+    if (!D.config.titulosV2) {
+      const l = D.itens.filter(it => it.outlook && it.sincronizar && !it.vinculado && !it.leitura && !ehG(it.outlook.calendarId));
+      for (const it of l) await sincronizar(it);
+      D.config.titulosV2 = true; salvar();
+      if (l.length) toast(`${l.length} evento(s) atualizados no Outlook com o novo padrão de título.`);
+    }
+    render();
+  }).catch(e => { erroOutlook = e.message; render(); });
   pedirNotif();
   setInterval(verificarLembretes, 30000); verificarLembretes();
   setInterval(() => { if (vista === 'calendario') posicionarCalendario(); }, 60000);
