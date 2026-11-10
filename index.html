@@ -680,7 +680,7 @@ function escurecer(hex, f) {
   const n = parseInt(m[1], 16); return '#' + [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * (1 - f)).toString(16).padStart(2, '0')).join('');
 }
 // eventos com fundo claro da cor da agenda + filete forte à esquerda: texto escuro e legível
-const estiloEv = () => (D && D.config.estiloEventos) || 'pastel';
+const estiloEv = () => (D && D.config.estiloEventos) || 'solido';
 function estiloSA(sa, cor) {
   if (estiloEv() === 'pastel') {
     // tons pastel: fundo claro e suave da cor da agenda, texto no tom escuro dela
@@ -1354,7 +1354,7 @@ function vConfig() {
     </div></div><div>
     <div class="card"><h3>Calendários exibidos</h3>${cals}<p class="hint">Agendas com o mesmo <b>grupo</b> aparecem como uma só no filtro do topo.</p></div>
     <div class="card"><h3>Aparência dos eventos</h3>
-      <label class="cb"><input type="radio" name="estEv" value="pastel" ${estiloEv() === 'pastel' ? 'checked' : ''}> Tons pastel, faixa da obra à esquerda</label>
+      <label class="cb"><input type="radio" name="estEv" value="pastel" ${estiloEv() === 'pastel' ? 'checked' : ''}> Tons pastel (eventos claros)</label>
       <label class="cb"><input type="radio" name="estEv" value="solido" ${estiloEv() === 'solido' ? 'checked' : ''}> Cor forte, texto branco</label>
       <label class="cb"><input type="radio" name="estEv" value="claro" ${estiloEv() === 'claro' ? 'checked' : ''}> Fundo claro com filete colorido, texto escuro</label></div>
     <div class="card"><h3>Lembretes</h3>
@@ -2094,7 +2094,7 @@ function partesEntrada(x) {
   const p = projetoDaEntrada(x); if (!p) return null;
   const t = x.k === 'ev' || (x.it && x.it.vinculado) ? tituloLimpo(x.titulo, p) : x.titulo.replace(' — ' + p.nome, '');
   const tg = tagProjeto(p);
-  return { p, obra: tg.nome, cor: tg.cor, faixa: estiloEv() === 'solido' ? tg.cor : clarear(tg.cor, .3), titulo: t || x.titulo };
+  return { p, obra: tg.nome, cor: tg.cor, faixa: clarear(tg.cor, .35), titulo: t || x.titulo };
 }
 // nas listas: nome da obra discreto, com um filete da cor da construtora
 function tituloHtml(x) {
