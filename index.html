@@ -5,193 +5,252 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meus Afazeres</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-/* Prancheta: azul de planta, concreto, grafite; laranja de segurança só para "hoje" e pendências */
+/* Estilo "maquete": painel de linho sobre fundo marinho, sálvia para estrutura, coral só para hoje e ações principais */
 :root{
-  --prancheta:#13304a; --prancheta-2:#1c4366; --concreto:#edeff2; --card:#fff; --ink:#1e2833; --muted:#667385; --line:#d9dee4; --line-2:#e9ecf0;
-  --accent:#1f5fa6; --accent-soft:#e7f0fa; --hoje:#f27a1a; --hoje-soft:#fff3e8; --danger:#c0392b; --ok:#2e7d4f; --warn:#b45309;
-  --cond:"IBM Plex Sans Condensed","Arial Narrow",sans-serif;
+  --marinho:#1f3b52; --linho:#ebe7df; --papel:#f8f6f1; --areia:#ddd6c9; --linha:#e6e1d7;
+  --salvia:#5b8a86; --salvia-esc:#2f5f63; --nevoa:#a9c3bf; --coral:#e8693f; --coral-soft:#fbe7de;
+  --ink:#23313d; --muted:#6d7a82; --danger:#c0392b; --ok:#3f7f6b; --warn:#b4541f;
+  --sombra:0 1px 0 rgba(255,255,255,.9) inset,0 10px 26px rgba(31,59,82,.08);
+  --accent:var(--salvia-esc); --accent-soft:#e3eeec; --hoje:var(--coral); --hoje-soft:var(--coral-soft); --line:var(--linha); --line-2:#efebe3; --card:var(--papel);
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{font:14px/1.5 "IBM Plex Sans","Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--concreto);display:flex;-webkit-font-smoothing:antialiased}
+body{font:14px/1.5 Manrope,"Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--marinho);-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(circle at 85% -10%,#2c5170 0,transparent 45%),radial-gradient(circle at 0% 110%,#183044 0,transparent 50%)}
 button{font:inherit;cursor:pointer;color:inherit}
 input,select,textarea{font:inherit;color:inherit}
-a{color:var(--accent)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--salvia-esc)}
+:focus-visible{outline:2px solid var(--coral);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+#app{display:flex;height:calc(100vh - 28px);margin:14px;background:var(--linho);border-radius:24px;overflow:hidden;box-shadow:0 30px 80px rgba(6,18,30,.45),0 0 0 1px rgba(255,255,255,.08)}
 
 /* menu lateral */
-#side{width:216px;flex:none;background:var(--prancheta);color:#c9d6e3;display:flex;flex-direction:column;padding:14px 10px;
-  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:16px 16px}
-#side h1{font:600 17px var(--cond);color:#fff;margin:4px 10px 18px;letter-spacing:.3px}
-#side nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;padding:9px 12px;border-radius:8px;margin-bottom:2px}
-#side nav button:hover{background:rgba(255,255,255,.08)}
-#side nav button.on{background:var(--prancheta-2);color:#fff;box-shadow:inset 3px 0 0 var(--hoje)}
-#side .ico{width:18px;text-align:center}
+#side{width:212px;flex:none;background:#e3ded4;display:flex;flex-direction:column;padding:16px 10px;border-right:1px solid var(--areia)}
+#side h1{font-weight:800;font-size:16px;color:var(--salvia-esc);margin:2px 10px 18px;letter-spacing:.1px}
+#side nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;padding:9px 12px;border-radius:12px;margin-bottom:3px;color:#56636b;font-weight:600}
+#side nav button:hover{background:rgba(255,255,255,.55)}
+#side nav button.on{background:var(--papel);color:var(--ink);box-shadow:var(--sombra)}
+#side nav button.on .ico{color:var(--coral)}
+#side .ico{width:18px;text-align:center;font-size:15px}
 #side .grow{flex:1}
-#btnMini{background:none;border:0;color:#8ea3b8;font-size:16px;padding:8px;margin-top:6px;border-radius:8px}
-#btnMini:hover{background:rgba(255,255,255,.08);color:#fff}
-body.mini #side{width:56px;padding:12px 6px}
+#btnMini{background:none;border:0;color:#7d8a90;font-size:16px;padding:8px;margin-top:6px;border-radius:10px}
+#btnMini:hover{background:rgba(255,255,255,.55)}
+body.mini #side{width:62px;padding:14px 8px}
 body.mini #side .tx{display:none}
-body.mini #side h1{margin:4px 0 16px;text-align:center}
-body.mini #side nav button{justify-content:center;padding:10px 0}
+body.mini #side h1{margin:2px 0 16px;text-align:center}
+body.mini #side nav button{justify-content:center;padding:11px 0}
 body.mini #side .ico{font-size:17px;width:auto}
-body.mini #outlookStatus{padding:8px 0;text-align:center;background:none}
+body.mini #outlookStatus{padding:8px 0;text-align:center;background:none;box-shadow:none}
 body.mini #outlookStatus .det{display:none}
 body.mini #outlookStatus .dot{margin:3px}
-#outlookStatus{font-size:12px;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,.18);line-height:1.4}
+#outlookStatus{font-size:12px;padding:10px 12px;border-radius:12px;background:var(--papel);box-shadow:var(--sombra);line-height:1.4;color:#56636b}
 #outlookStatus .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
 
 /* área principal */
 #main{flex:1;display:flex;flex-direction:column;min-width:0}
-#top{display:flex;align-items:center;gap:8px;padding:12px 22px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap}
-#top h2{margin:0 auto 0 0;font:600 21px var(--cond);letter-spacing:.2px}
+#top{display:flex;align-items:center;gap:8px;padding:14px 22px 10px;flex-wrap:wrap}
+#top h2{margin:0 auto 0 0;font-weight:800;font-size:22px;letter-spacing:-.2px}
 #filtros{display:flex;gap:6px;flex-wrap:wrap}
-.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px}
+.chip{border:1px solid var(--areia);background:var(--papel);border-radius:999px;padding:6px 13px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;font-weight:600;box-shadow:var(--sombra)}
 .chip .sw{width:9px;height:9px}
-.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 13px;font-weight:500}
-.btn:hover{background:#f3f5f8;border-color:#c9d0d9}
-.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn.pri:hover{background:#1a528f}
+.btn{border:1px solid var(--areia);background:var(--papel);border-radius:12px;padding:7px 14px;font-weight:600;box-shadow:0 1px 0 #fff inset}
+.btn:hover{background:#fff}
+.btn.pri{background:var(--coral);border-color:var(--coral);color:#fff;box-shadow:0 6px 14px rgba(232,105,63,.28)}
+.btn.pri:hover{background:#d95a31}
 .btn.dan{color:var(--danger)}
-.btn.sm{padding:4px 10px;font-size:12.5px}
+.btn.sm{padding:4px 11px;font-size:12.5px;border-radius:10px}
 .btn[disabled]{opacity:.5;cursor:default}
-#view{flex:1;overflow:auto;padding:18px 22px 40px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
-.card h3{margin:0 0 10px;font:600 16px var(--cond);color:var(--ink);letter-spacing:.2px}
+#view{flex:1;overflow:auto;padding:6px 22px 30px}
+.card{background:var(--papel);border:1px solid rgba(255,255,255,.7);border-radius:18px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--sombra)}
+.card h3{margin:0 0 10px;font-weight:700;font-size:15.5px;color:var(--ink);letter-spacing:-.1px}
 .empty{color:var(--muted);padding:4px 0}
-.row{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:8px;border-bottom:1px solid var(--line-2)}
+.row{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:12px;border-bottom:1px solid var(--line-2)}
 .row:last-child{border-bottom:0}
-.row:hover{background:#f6f8fa}
+.row:hover{background:#fff}
 .row .time{width:96px;flex:none;color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px}
-.row .bar{width:4px;align-self:stretch;border-radius:2px;flex:none}
+.row .bar{width:4px;align-self:stretch;border-radius:3px;flex:none}
 .row .txt{flex:1;min-width:0;cursor:pointer}
-.row .t{font-weight:500}
+.row .t{font-weight:600}
 .row .s{font-size:12.5px;color:var(--muted)}
 .row.done .t{text-decoration:line-through;color:var(--muted)}
-.chk{width:18px;height:18px;flex:none;accent-color:var(--ok);cursor:pointer}
-.tag{font-size:11px;border-radius:4px;padding:1px 6px;background:#eef1f4;color:#4a5667;margin-left:6px;white-space:nowrap;font-weight:500}
-.tag.ol{background:var(--accent-soft);color:var(--accent)}
-.tag.err{background:#fdecea;color:var(--danger)}
-.tag.late{background:var(--hoje-soft);color:var(--warn)}
+.chk{width:18px;height:18px;flex:none;accent-color:var(--salvia);cursor:pointer}
+.tag{font-size:11px;border-radius:6px;padding:1px 7px;background:#ece7de;color:#5c6870;margin-left:6px;white-space:nowrap;font-weight:600}
+.tag.ol{background:var(--accent-soft);color:var(--salvia-esc)}
+.tag.err{background:#fbe3df;color:var(--danger)}
+.tag.late{background:var(--coral-soft);color:var(--warn)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
 .sw{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none}
 .hint{font-size:12.5px;color:var(--muted)}
 
-/* visão semana (lista por dia) */
-.semana{display:grid;grid-template-columns:var(--cols,repeat(7,minmax(0,1fr)));gap:8px}
-.dia{min-width:0;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;min-height:170px}
-.dia.hoje{border-color:var(--hoje);box-shadow:inset 0 3px 0 var(--hoje)}
-.dia h4{margin:0 0 8px;font:600 14px var(--cond);display:flex;justify-content:space-between;align-items:baseline}
-.dia h4 small{color:var(--muted);font:400 12px "IBM Plex Sans",sans-serif}
-.ent{font-size:12.5px;border-left:3px solid;padding:5px 7px;margin-bottom:5px;border-radius:6px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+/* painel */
+.painel{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:14px;align-items:start}
+.painel .ola{grid-column:1/-1;display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:0;background:linear-gradient(120deg,var(--papel) 0,var(--papel) 55%,#e9f0ee 100%)}
+.painel .ola h2{margin:0;font-weight:800;font-size:24px;letter-spacing:-.3px}
+.painel .ola p{margin:2px 0 0}
+.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
+.kpi{background:#fff;border-radius:14px;padding:8px 14px;min-width:96px;display:flex;flex-direction:column;box-shadow:0 1px 0 #fff inset,0 4px 12px rgba(31,59,82,.06)}
+.kpi b{font-weight:800;font-size:22px;color:var(--salvia-esc);line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--muted)}
+.kpi.alerta b{color:var(--coral)}
+.kpi.anel{flex-direction:row;align-items:center;gap:8px}
+.kpi.anel b{font-size:14px;color:var(--ink)}
+.atalhos{display:flex;gap:8px}
+.col-a,.col-b{min-width:0}
+.minical{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.minical .mh{font-size:11px;color:var(--muted);font-weight:700;padding-bottom:2px}
+.minical .md{border:0;background:none;border-radius:10px;padding:5px 0 3px;font-weight:600;font-size:12.5px;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:center;gap:2px}
+.minical .md:hover{background:#fff}
+.minical .md.fora{color:#b3b9b8}
+.minical .md.hoje{background:var(--coral);color:#fff}
+.minical .md i{display:flex;gap:2px;height:5px}
+.minical .md i b,.ponto{width:5px;height:5px;border-radius:50%;background:var(--salvia);display:inline-block}
+.minical .md i b.c,.ponto.c{background:var(--coral)}
+.minical .md.hoje i b{background:#fff}
+.obras{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.obra{position:relative;text-align:left;border:0;background:#fff;border-radius:14px;padding:12px 12px 12px 16px;display:flex;flex-direction:column;gap:2px;box-shadow:0 4px 12px rgba(31,59,82,.06);overflow:hidden}
+.obra::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c)}
+.obra:hover{box-shadow:0 8px 20px rgba(31,59,82,.12)}
+.obra .on{font-weight:700}
+.obra .oc{font-size:12px;color:var(--muted)}
+.obra .op{font-size:12px;color:var(--salvia-esc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obra .ob{position:absolute;top:10px;right:10px;background:var(--coral);color:#fff;border-radius:999px;font-size:11px;font-weight:800;min-width:20px;height:20px;line-height:20px;text-align:center;padding:0 6px}
+
+/* tarefas */
+.tfiltros{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px}
+.tfiltros input,.tfiltros select{border:1px solid var(--areia);border-radius:10px;padding:7px 10px;background:#fff}
+.tfiltros input{min-width:220px}
+.quadro{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:12px;align-items:start;overflow-x:auto;padding-bottom:6px}
+.qcol{background:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.6);border-radius:18px;padding:10px;min-height:120px}
+.qcol h3{display:flex;justify-content:space-between;align-items:center;margin:2px 4px 10px;font-size:14px;font-weight:700}
+.qcol h3 span{background:var(--papel);border-radius:999px;padding:0 9px;font-size:12px;color:var(--muted)}
+.qcol.alerta h3{color:var(--warn)}
+.qcol.hoje h3 span{background:var(--coral);color:#fff}
+.tcard{display:flex;gap:9px;align-items:flex-start;background:var(--papel);border-radius:14px;padding:10px 10px 10px 12px;margin-bottom:8px;box-shadow:var(--sombra);border-left:4px solid var(--c)}
+.tcard .chk{margin-top:2px}
+.tcard .tb{flex:1;min-width:0;cursor:pointer}
+.tcard .tt{font-weight:600;line-height:1.35}
+.tcard .ts{font-size:12px;color:var(--muted);margin-top:2px}
+.tcard.done .tt{text-decoration:line-through;color:var(--muted)}
+.qcol.feitas .tcard{opacity:.7}
+
+/* visão semana */
+.semana{display:grid;grid-template-columns:var(--cols,repeat(7,minmax(0,1fr)));gap:10px}
+.dia{min-width:0;overflow:hidden;background:var(--papel);border:1px solid rgba(255,255,255,.7);border-radius:18px;padding:10px;min-height:170px;box-shadow:var(--sombra)}
+.dia.hoje{box-shadow:inset 0 3px 0 var(--coral),var(--sombra)}
+.dia h4{margin:0 0 8px;font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:baseline}
+.dia h4 small{color:var(--muted);font-weight:500;font-size:12px}
+.ent{font-size:12.5px;border-left:3px solid;padding:5px 7px;margin-bottom:5px;border-radius:8px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
 .ent.done{opacity:.5;text-decoration:line-through}
-.ent b{font-weight:600;font-variant-numeric:tabular-nums}
+.ent b{font-weight:700;font-variant-numeric:tabular-nums}
 
 /* calendário */
 .cal-head{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.cal-head .lbl{font:600 19px var(--cond);margin:0 8px;min-width:210px;letter-spacing:.2px}
-.wk{display:grid;grid-template-columns:var(--cols,52px repeat(7,minmax(0,1fr)));background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.wk .hd{padding:8px 6px 6px;text-align:center;border-bottom:1px solid var(--line);display:flex;flex-direction:column;align-items:center;line-height:1.1;min-width:0}
-.wk .hd .dw{font-size:11.5px;color:var(--muted);text-transform:lowercase}
-.wk .hd .dn{font:600 20px var(--cond);color:var(--ink)}
-.wk .hd.hoje{box-shadow:inset 0 3px 0 var(--hoje)}
-.wk .hd.hoje .dn{color:#fff;background:var(--hoje);border-radius:999px;min-width:30px;padding:0 6px}
-.wk .hd.hoje .dw{color:var(--hoje);font-weight:600}
-.wk .ad{min-width:0;overflow:hidden;border-bottom:1px solid var(--line);min-height:28px;padding:3px;border-left:1px solid var(--line-2)}
+.cal-head .lbl{font-weight:800;font-size:19px;margin:0 8px;min-width:210px;letter-spacing:-.2px}
+.wk{display:grid;grid-template-columns:var(--cols,52px repeat(7,minmax(0,1fr)));background:var(--papel);border:1px solid rgba(255,255,255,.7);border-radius:18px;overflow:hidden;box-shadow:var(--sombra)}
+.wk .hd{padding:8px 6px 6px;text-align:center;border-bottom:1px solid var(--linha);display:flex;flex-direction:column;align-items:center;line-height:1.1;min-width:0}
+.wk .hd .dw{font-size:11.5px;color:var(--muted);text-transform:lowercase;font-weight:600}
+.wk .hd .dn{font-weight:800;font-size:19px;color:var(--ink)}
+.wk .hd.hoje .dn{color:#fff;background:var(--coral);border-radius:999px;min-width:30px;padding:0 7px}
+.wk .hd.hoje .dw{color:var(--coral)}
+.wk .ad{min-width:0;overflow:hidden;border-bottom:1px solid var(--linha);min-height:28px;padding:3px;border-left:1px solid var(--line-2)}
 .wk .hrs{position:relative}
 .wk .hr{height:48px;font-size:11px;color:var(--muted);text-align:right;padding-right:6px;transform:translateY(-7px);font-variant-numeric:tabular-nums}
-.wk .col{position:relative;border-left:1px solid var(--line-2);background:repeating-linear-gradient(#fff 0 47px,var(--line-2) 47px 48px)}
-.wk .col.hoje{background:repeating-linear-gradient(#fffaf5 0 47px,#f3e6da 47px 48px)}
-.ev{position:absolute;border-radius:6px;padding:3px 6px;font-size:12px;overflow:hidden;cursor:pointer;line-height:1.28;color:var(--ink)}
-.ev b{font-weight:600;font-variant-numeric:tabular-nums}
+.wk .col{position:relative;border-left:1px solid var(--line-2);background:repeating-linear-gradient(transparent 0 47px,var(--line-2) 47px 48px)}
+.wk .col.hoje{background:repeating-linear-gradient(rgba(232,105,63,.05) 0 47px,#f1e2d9 47px 48px)}
+.ev{position:absolute;border-radius:8px;padding:3px 6px;font-size:12px;overflow:hidden;cursor:pointer;line-height:1.28;color:var(--ink)}
+.ev b{font-weight:700;font-variant-numeric:tabular-nums}
 .ev.done{opacity:.45}
 .ev.movel{cursor:grab;touch-action:none}
 .ev .rs{position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
-.ev.arrastando{opacity:.92;z-index:5;box-shadow:0 8px 22px rgba(19,48,74,.28);cursor:grabbing}
+.ev.arrastando{opacity:.92;z-index:5;box-shadow:0 10px 26px rgba(31,59,82,.3);cursor:grabbing}
 body.arrastando,body.arrastando *{user-select:none!important}
 .semana,.mes,.wk{touch-action:pan-y}
-.adchip{font-size:11.5px;border-radius:5px;padding:2px 6px;margin:1px 0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nowline{position:absolute;left:0;right:0;height:2px;background:var(--hoje);z-index:3}
-.nowline::before{content:"";position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--hoje)}
+.adchip{font-size:11.5px;border-radius:6px;padding:2px 6px;margin:1px 0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nowline{position:absolute;left:0;right:0;height:2px;background:var(--coral);z-index:3}
+.nowline::before{content:"";position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--coral)}
 @keyframes gira{to{transform:rotate(360deg)}}
 .btn.girando{animation:gira 1s linear infinite}
-.mes{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.mes .hd{padding:7px;text-align:center;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);text-transform:lowercase}
+.mes{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--papel);border:1px solid rgba(255,255,255,.7);border-radius:18px;overflow:hidden;box-shadow:var(--sombra)}
+.mes .hd{padding:7px;text-align:center;font-size:12px;color:var(--muted);border-bottom:1px solid var(--linha);text-transform:lowercase;font-weight:600}
 .mes .cel{min-width:0;overflow:hidden;min-height:108px;border-right:1px solid var(--line-2);border-bottom:1px solid var(--line-2);padding:4px;cursor:pointer}
-.mes .cel.fora{background:#f7f8fa;color:#a3acb8}
-.mes .cel.hoje{background:var(--hoje-soft)}
-.mes .cel.hoje .n{background:var(--hoje);color:#fff;border-radius:50%}
-.mes .n{display:inline-block;width:24px;height:24px;text-align:center;line-height:24px;font:600 13px var(--cond)}
+.mes .cel.fora{background:#f1eee8;color:#a9afae}
+.mes .cel.hoje{background:var(--coral-soft)}
+.mes .cel.hoje .n{background:var(--coral);color:#fff;border-radius:50%}
+.mes .n{display:inline-block;width:24px;height:24px;text-align:center;line-height:24px;font-weight:700;font-size:12.5px}
 .mes .mais{font-size:11px;color:var(--muted)}
 
 /* projetos */
 .proj-wrap{display:grid;grid-template-columns:270px 1fr;gap:14px;align-items:start}
 .plist .area{margin-bottom:12px}
-.plist .ah{display:flex;align-items:center;gap:8px;font-weight:600;padding:6px 8px;border-radius:8px;cursor:pointer}
-.plist .ah:hover,.plist .pi:hover{background:#f0f3f6}
+.plist .ah{display:flex;align-items:center;gap:8px;font-weight:700;padding:7px 9px;border-radius:12px;cursor:pointer}
+.plist .ah:hover,.plist .pi:hover{background:#fff}
 .plist .ah.sel,.plist .pi.sel{background:var(--accent-soft)}
-.plist .pi{padding:6px 8px 6px 28px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:6px}
+.plist .pi{padding:6px 9px 6px 28px;border-radius:12px;cursor:pointer;display:flex;justify-content:space-between;gap:6px;font-weight:500}
 .plist .pi small{color:var(--muted)}
-.sec-h{display:flex;align-items:center;justify-content:space-between;margin:2px 0 6px;gap:8px}
+.sec-h{display:flex;align-items:center;justify-content:space-between;margin:2px 0 8px;gap:8px}
+.sec-h h3{margin:0}
 
 /* janelas */
-#modalBg{position:fixed;inset:0;background:rgba(19,48,74,.42);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50}
+#modalBg{position:fixed;inset:0;background:rgba(19,38,54,.5);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50;backdrop-filter:blur(2px)}
 #modalBg.on{display:flex}
-#modal{background:#fff;border-radius:14px;width:min(640px,100%);padding:20px 22px;box-shadow:0 24px 64px rgba(19,48,74,.3);animation:sobe .14s ease-out}
+#modal{background:var(--papel);border-radius:22px;width:min(640px,100%);padding:22px 24px;box-shadow:0 30px 70px rgba(6,18,30,.4);animation:sobe .14s ease-out}
 @keyframes sobe{from{transform:translateY(8px);opacity:0}}
-#modal h3{margin:0 0 14px;font:600 20px var(--cond)}
+#modal h3{margin:0 0 14px;font-weight:800;font-size:20px;letter-spacing:-.2px}
 .f{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
-.f label{font-size:12.5px;color:var(--muted);font-weight:500}
-.f input,.f select,.f textarea{border:1px solid #cfd5dd;border-radius:8px;padding:7px 9px;background:#fff}
-.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.f label{font-size:12.5px;color:var(--muted);font-weight:600}
+.f input,.f select,.f textarea{border:1px solid var(--areia);border-radius:10px;padding:8px 10px;background:#fff}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--salvia);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
 .f textarea{min-height:70px;resize:vertical}
 .fr{display:flex;gap:12px;flex-wrap:wrap}
 .fr>.f{flex:1;min-width:130px}
 .dows{display:flex;gap:4px}
-.dows label{border:1px solid #cfd5dd;border-radius:6px;padding:4px 8px;font-size:12.5px;cursor:pointer;font-weight:500}
+.dows label{border:1px solid var(--areia);border-radius:8px;padding:4px 9px;font-size:12.5px;cursor:pointer;font-weight:600;background:#fff}
 .dows input{display:none}
-.dows label:has(input:checked){background:var(--accent);border-color:var(--accent);color:#fff}
+.dows label:has(input:checked){background:var(--salvia-esc);border-color:var(--salvia-esc);color:#fff}
 .cb{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;align-items:center;flex-wrap:wrap}
 .acts .l{margin-right:auto}
-.box{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:#f8f9fb}
-#toast{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:60}
-.toast{background:var(--prancheta);color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 8px 24px rgba(19,48,74,.25);max-width:380px;font-size:13.5px}
+.box{border:1px solid var(--linha);border-radius:14px;padding:12px;margin-bottom:12px;background:#f2efe8}
+#toast{position:fixed;right:28px;bottom:28px;display:flex;flex-direction:column;gap:8px;z-index:60}
+.toast{background:var(--marinho);color:#fff;padding:11px 16px;border-radius:14px;box-shadow:0 10px 26px rgba(6,18,30,.35);max-width:380px;font-size:13.5px;font-weight:500}
 .toast.err{background:var(--danger)}
 table.cfg{border-collapse:collapse;width:100%}
 table.cfg td{padding:6px 4px;border-bottom:1px solid var(--line-2);vertical-align:middle}
 body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemanda{display:none}
+@media (max-width:1100px){.painel{grid-template-columns:1fr}.kpis{margin-left:0}}
 @media (max-width:820px){
-  body{flex-direction:column}
-  #side,body.mini #side{width:auto;order:2;flex-direction:row;padding:4px 6px;background-image:none}
+  #app{margin:0;height:100vh;border-radius:0;flex-direction:column}
+  #side,body.mini #side{width:auto;order:2;flex-direction:row;padding:4px 6px;border-right:0;border-top:1px solid var(--areia)}
   #side h1,#side .grow,#outlookStatus,#btnMini{display:none}
   #side nav{display:flex;width:100%;justify-content:space-around}
   #side nav button,body.mini #side nav button{flex-direction:column;gap:1px;padding:8px 10px;width:auto;margin:0}
-  #side nav button.on{box-shadow:inset 0 -3px 0 var(--hoje)}
   #main{order:1;min-height:0}
-  #top{padding:10px 12px;gap:6px}
+  #top{padding:10px 12px 6px;gap:6px}
   #top h2{width:100%}
-  #view{padding:12px 10px 30px}
+  #view{padding:4px 10px 24px}
   .grid2,.proj-wrap{grid-template-columns:1fr}
   .semana{grid-template-columns:1fr}
+  .quadro{grid-template-columns:1fr}
   .wk{font-size:11px}
   .ev{font-size:10.5px;padding:2px 3px}
   .wk .hd .dn{font-size:16px}
   .row .time{width:74px;font-size:12px}
+  .tfiltros input{min-width:0;flex:1}
   #modalBg{padding:10px}
 }
 </style>
 </head>
 <body>
+<div id="app">
 <aside id="side">
   <h1><span>✔</span><span class="tx"> Meus Afazeres</span></h1>
   <nav id="nav">
-    <button data-v="hoje" title="Hoje"><span class="ico">☀</span><span class="tx">Hoje</span></button>
-    <button data-v="semana" title="Semana"><span class="ico">▤</span><span class="tx">Semana</span></button>
+    <button data-v="painel" title="Painel"><span class="ico">⌂</span><span class="tx">Painel</span></button>
     <button data-v="calendario" title="Calendário"><span class="ico">▦</span><span class="tx">Calendário</span></button>
+    <button data-v="semana" title="Semana"><span class="ico">▤</span><span class="tx">Semana</span></button>
+    <button data-v="tarefas" title="Tarefas"><span class="ico">☑</span><span class="tx">Tarefas</span></button>
     <button data-v="projetos" title="Empresas e projetos"><span class="ico">◧</span><span class="tx">Empresas e projetos</span></button>
     <button data-v="config" title="Configurações"><span class="ico">⚙</span><span class="tx">Configurações</span></button>
   </nav>
@@ -208,6 +267,7 @@ body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemand
     <button class="btn pri" id="btnNovo">+ Novo</button>
   </div>
   <div id="view"></div>
+</div>
 </div>
 <div id="modalBg"><div id="modal"></div></div>
 <div id="toast"></div>
@@ -554,7 +614,7 @@ function marcarCarregando() {
 }
 let ultimoRefresh = 0;
 function atualizarAgora() {
-  if (!ultimaFaixa || !['hoje', 'semana', 'calendario'].includes(vista)) return;
+  if (!ultimaFaixa || !['painel', 'semana', 'calendario'].includes(vista)) return;
   if ($('#modalBg').classList.contains('on') || (drag && drag.ativo) || document.visibilityState !== 'visible') return;
   ultimoRefresh = Date.now();
   carregarEventos(ultimaFaixa.ini, ultimaFaixa.fim, true, true);
@@ -921,14 +981,15 @@ function linha(x, opts = {}) {
 
 /* ================= views ================= */
 let vista = 'calendario', refSemana = domingo(hoje0()), refCal = hoje0(), modoCal = 'semana', selProj = null;
-const TITULOS = { hoje: 'Hoje', semana: 'Semana', calendario: 'Calendário', projetos: 'Empresas e projetos', config: 'Configurações' };
+const TITULOS = { painel: 'Painel', tarefas: 'Tarefas', hoje: 'Painel', semana: 'Semana', calendario: 'Calendário', projetos: 'Empresas e projetos', config: 'Configurações' };
 function irPara(v) { vista = v; render(); }
 function render() {
   if (drag && drag.ativo) return;
   $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === vista));
   $('#titulo').textContent = TITULOS[vista];
   renderFiltros(); renderStatus();
-  const f = { hoje: vHoje, semana: vSemana, calendario: vCalendario, projetos: vProjetos, config: vConfig }[vista];
+  if (vista === 'hoje') vista = 'painel';
+  const f = { painel: vPainel, tarefas: vTarefas, semana: vSemana, calendario: vCalendario, projetos: vProjetos, config: vConfig }[vista];
   const sc = $('#view').scrollTop;
   $('#view').innerHTML = f();
   if (vista === 'calendario' && modoCal === 'semana') posicionarCalendario();
@@ -937,7 +998,7 @@ function render() {
 }
 let filtroAberto = false;
 function renderFiltros() {
-  const show = ['hoje', 'semana', 'calendario'].includes(vista);
+  const show = ['painel', 'semana', 'calendario'].includes(vista);
   if (!show) { $('#filtros').innerHTML = ''; return; }
   const gs = gruposFiltro(), on = gs.filter(g => !filtroOff.has(g.k)).length;
   $('#filtros').innerHTML = `<div style="position:relative">
@@ -961,39 +1022,109 @@ function renderStatus() {
   el.innerHTML = h;
 }
 
-function vHoje() {
-  const h = hoje0(), hs = ymd(h);
-  carregarEventos(h, addDays(h, 14));
-  const hojeL = entradas(h, h);
-  // atrasados: itens não concluídos dos últimos 14 dias
-  const atr = [];
+function atrasadosItens(h) {
+  const hs = ymd(h), atr = [];
   D.itens.forEach(it => {
     if (filtrado(it) || it.tipo === 'reuniao' || it.avisoDe) return;
     if (!it.recorrencia && it.data && it.data < hs && !it.concluidas[it.data]) atr.push({ k: 'item', it, data: it.data, hora: it.hora, titulo: it.titulo, cor: corItem(it), feito: false });
     if (it.recorrencia) ocorrencias(it, addDays(h, -14), addDays(h, -1)).forEach(d => { if (!it.concluidas[d]) atr.push({ k: 'item', it, data: d, hora: it.hora, titulo: it.titulo, cor: corItem(it), feito: false }); });
   });
-  atr.sort((a, b) => a.data.localeCompare(b.data));
-  const semData = D.itens.filter(it => !it.data && !filtrado(it) && !it.concluidas['-']);
+  return atr.sort((a, b) => a.data.localeCompare(b.data));
+}
+function anel(feito, total, cor) {
+  const r = 22, c = 2 * Math.PI * r, f = total ? feito / total : 0;
+  return `<svg width="58" height="58" viewBox="0 0 58 58" aria-hidden="true"><circle cx="29" cy="29" r="${r}" fill="none" stroke="var(--areia)" stroke-width="7"/><circle cx="29" cy="29" r="${r}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 29 29)"/></svg>`;
+}
+function saudacao() { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
+function vPainel() {
+  const h = hoje0(), hs = ymd(h), m0 = new Date(h.getFullYear(), h.getMonth(), 1), iniM = domingo(m0), fimM = addDays(iniM, 41);
+  carregarEventos(iniM < domingo(h) ? iniM : domingo(h), fimM > addDays(h, 14) ? fimM : addDays(h, 14));
+  const hojeL = entradas(h, h), atr = atrasadosItens(h), pc = pendenciasControle();
   const prox = entradas(addDays(h, 1), addDays(h, 14)).filter(x => x.k === 'item' && x.it.tipo === 'entrega');
-  const amanha = entradas(addDays(h, 1), addDays(h, 1));
-  return `
-  <div class="card" style="display:flex;align-items:center;gap:14px">
-    <div style="font:600 40px/1 var(--cond);color:var(--hoje);min-width:48px;text-align:center">${h.getDate()}</div>
-    <div><div style="font:600 18px var(--cond)">${DIAS_L[h.getDay()].charAt(0).toUpperCase() + DIAS_L[h.getDay()].slice(1)}</div><div class="hint">${MESES[h.getMonth()]} de ${h.getFullYear()} · ${hojeL.filter(x => !x.feito).length} compromisso(s) pendente(s) hoje</div></div>
-  </div>
-  <div class="grid2">
-    <div>
-      ${(() => { const pc = pendenciasControle(); return pc.length ? `<div class="card"><h3>Pendências de controle (${pc.length})</h3>${pc.map(x => linhaCtl(x)).join('')}</div>` : ''; })()}
-      ${atr.length ? `<div class="card"><h3>Atrasados</h3>${atr.map(x => linha(x, { dataNaLinha: true, late: true })).join('')}</div>` : ''}
-      <div class="card"><h3>Hoje</h3>${hojeL.length ? hojeL.map(x => linha(x)).join('') : '<div class="empty">Nada marcado para hoje.</div>'}</div>
-      ${semData.length ? `<div class="card"><h3>Tarefas sem data</h3>${semData.map(it => `<div class="row"><input type="checkbox" class="chk" data-conc="${it.id}|-"><div class="bar" style="background:${corItem(it)}"></div><div class="txt" data-item="${it.id}"><div class="t">${esc(it.titulo)}</div><div class="s">${subtitulo({ k: 'item', it })}</div></div></div>`).join('')}</div>` : ''}
+  const semIni = domingo(h), semFim = addDays(semIni, 6);
+  const tarefasSem = entradas(semIni, semFim).filter(x => x.k === 'item' && x.it.tipo !== 'reuniao' && !x.it.avisoDe).concat(controleEntre(semIni, semFim));
+  const feitosSem = tarefasSem.filter(x => x.feito).length;
+  const reunHoje = hojeL.filter(x => (x.k === 'ev' && ehReuniao(x.e)) || (x.k === 'item' && x.it.tipo === 'reuniao'));
+  const pendHoje = hojeL.filter(x => x.k === 'item' && !x.feito && x.it.tipo !== 'reuniao').length + pc.filter(x => x.data === hs).length;
+  const nAtr = atr.length + pc.filter(x => x.data < hs && !x.alerta).length;
+  // mini-mês
+  const entM = entradas(iniM, fimM), ctlM = controleEntre(iniM, fimM);
+  let mini = `<div class="minical">${[0, 1, 2, 3, 4, 5, 6].map(i => `<span class="mh">${DIAS[i][0]}</span>`).join('')}`;
+  for (let i = 0; i < 42; i++) {
+    const dd = addDays(iniM, i), d = ymd(dd), n = entM.filter(x => x.data === d).length, nc = ctlM.filter(x => x.data === d && !x.feito).length;
+    mini += `<button class="md ${dd.getMonth() !== m0.getMonth() ? 'fora' : ''} ${d === hs ? 'hoje' : ''}" data-dia="${d}" title="${n} compromisso(s)${nc ? ', ' + nc + ' pendência(s)' : ''}">${dd.getDate()}<i>${n ? '<b></b>' : ''}${nc ? '<b class="c"></b>' : ''}</i></button>`;
+  }
+  mini += '</div>';
+  // obras
+  const obras = D.projetos.filter(p => p.categoria !== 'pessoal').map(p => {
+    const t = CATEGORIAS[p.categoria] ? tarefasControle(p, h, addDays(h, 45)).filter(x => !x.feito) : [];
+    const pend = pc.filter(x => x.p.id === p.id).length + atr.filter(x => x.it.projetoId === p.id).length;
+    const reun = D.itens.filter(i => i.projetoId === p.id && i.tipo === 'reuniao' && i.data >= hs).sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora))[0];
+    return { p, prox: t[0], pend, reun };
+  });
+  const tile = (n, rot, cls) => `<div class="kpi ${cls || ''}"><b>${n}</b><span>${rot}</span></div>`;
+  return `<div class="painel">
+    <section class="ola card">
+      <div><h2>${saudacao()}${conta && conta.name ? ', ' + esc(conta.name.split(' ')[0]) : ''}</h2>
+        <p class="hint">${DIAS_L[h.getDay()].charAt(0).toUpperCase() + DIAS_L[h.getDay()].slice(1)}, ${h.getDate()} de ${MESES[h.getMonth()]}</p></div>
+      <div class="kpis">${tile(pendHoje, 'para hoje')}${tile(nAtr, 'atrasadas', nAtr ? 'alerta' : '')}${tile(reunHoje.length, reunHoje.length === 1 ? 'reunião hoje' : 'reuniões hoje')}
+        <div class="kpi anel">${anel(feitosSem, tarefasSem.length, 'var(--salvia)')}<span><b>${feitosSem}/${tarefasSem.length}</b> na semana</span></div></div>
+    </section>
+    <div class="col-a">
+      <section class="card"><div class="sec-h"><h3>Agenda de hoje</h3><button class="btn sm" data-v-ir="calendario">Abrir calendário</button></div>
+        ${hojeL.length ? hojeL.map(x => linha(x)).join('') : '<div class="empty">Dia livre. Use + Novo para planejar algo.</div>'}</section>
+      ${pc.length ? `<section class="card"><h3>Pendências de controle (${pc.length})</h3>${pc.map(x => linhaCtl(x)).join('')}</section>` : ''}
+      ${atr.length ? `<section class="card"><h3>Atrasados</h3>${atr.map(x => linha(x, { dataNaLinha: true, late: true })).join('')}</section>` : ''}
     </div>
-    <div>
-      <div class="card"><h3>Amanhã · ${fmtData(ymd(addDays(h, 1)))}</h3>${amanha.length ? amanha.map(x => linha(x)).join('') : '<div class="empty">Nada marcado.</div>'}</div>
-      ${(() => { const pc = controleEntre(addDays(h, 1), addDays(h, 7)).filter(x => !x.feito); return pc.length ? `<div class="card"><h3>Controle · próximos 7 dias</h3>${pc.map(x => linhaCtl(x)).join('')}</div>` : ''; })()}
-      <div class="card"><h3>Próximas entregas (14 dias)</h3>${prox.length ? prox.map(x => linha(x, { dataNaLinha: true })).join('') : '<div class="empty">Nenhuma entrega nos próximos 14 dias.</div>'}</div>
-    </div>
-  </div>`;
+    <div class="col-b">
+      <section class="card"><div class="sec-h"><h3 style="text-transform:capitalize">${MESES[m0.getMonth()]}</h3><span class="hint"><b class="ponto"></b> compromissos <b class="ponto c"></b> pendências</span></div>${mini}</section>
+      ${obras.length ? `<section class="card"><div class="sec-h"><h3>Obras e projetos</h3><button class="btn sm" data-v-ir="projetos">Ver todos</button></div><div class="obras">${obras.map(o => `
+        <button class="obra" data-selproj="${o.p.id}" style="--c:${corCtl(o.p)}">
+          <span class="on">${esc(o.p.nome)}</span>
+          <span class="oc">${CATEGORIAS[o.p.categoria] ? esc(CATEGORIAS[o.p.categoria].nome) : 'Sem categoria'}${o.p.local ? ' · ' + esc(o.p.local) : ''}</span>
+          ${o.prox ? `<span class="op">Próximo: ${esc(o.prox.titulo)} · ${fmtData(o.prox.data)}</span>` : ''}
+          ${o.reun ? `<span class="op">Reunião: ${fmtData(o.reun.data)}${o.reun.hora ? ' ' + o.reun.hora : ''}</span>` : ''}
+          ${o.pend ? `<span class="ob">${o.pend}</span>` : ''}</button>`).join('')}</div></section>` : ''}
+      <section class="card"><h3>Próximas entregas</h3>${prox.length ? prox.map(x => linha(x, { dataNaLinha: true })).join('') : '<div class="empty">Nenhuma entrega nos próximos 14 dias.</div>'}</section>
+    </div></div>`;
+}
+let tFiltro = { proj: '', cat: '', q: '', rotinas: true };
+function vTarefas() {
+  const h = hoje0(), hs = ymd(h), fim = addDays(h, 7);
+  const cards = [];
+  D.itens.forEach(it => {
+    if (it.tipo === 'reuniao' || it.avisoDe) return;
+    if (!it.data) { if (!it.concluidas['-']) cards.push({ k: 'item', it, data: '', titulo: it.titulo, feito: false, chave: '-' }); return; }
+    const ocs = it.recorrencia ? ocorrencias(it, addDays(h, -14), fim) : [it.data];
+    ocs.forEach(d => { if (d > ymd(fim) || (d < ymd(addDays(h, -30)))) return; cards.push({ k: 'item', it, data: d, titulo: it.titulo, feito: !!it.concluidas[d], chave: d }); });
+  });
+  pendenciasControle().concat(controleEntre(h, fim)).forEach(x => { if (!cards.some(c => c.k === 'ctl' && c.p.id === x.p.id && c.pkey === x.pkey && c.tkey === x.tkey)) cards.push(x); });
+  const pid = c => c.k === 'ctl' ? c.p.id : c.it.projetoId, cat = c => { const p = projeto(pid(c)); return p ? p.categoria || '' : ''; };
+  const q = tFiltro.q.trim().toLowerCase();
+  cards.sort((a, b) => (a.data || '9').localeCompare(b.data || '9') || ((a.k === 'item' && a.it.hora) || '').localeCompare((b.k === 'item' && b.it.hora) || ''));
+  const vis = cards.filter(c => (tFiltro.rotinas || !(c.k === 'item' && c.it.recorrencia)) && (!tFiltro.proj || pid(c) === tFiltro.proj) && (!tFiltro.cat || cat(c) === tFiltro.cat) && (!q || c.titulo.toLowerCase().includes(q)));
+  const colunas = [
+    ['Atrasadas', vis.filter(c => !c.feito && c.data && c.data < hs), 'alerta'],
+    ['Hoje', vis.filter(c => !c.feito && c.data === hs), 'hoje'],
+    ['Próximos 7 dias', vis.filter(c => !c.feito && c.data > hs), ''],
+    ['Sem data', vis.filter(c => !c.feito && !c.data), ''],
+    ['Concluídas', vis.filter(c => c.feito && c.data >= ymd(addDays(h, -7))), 'feitas']
+  ];
+  const card = c => {
+    const p = projeto(pid(c)), cor = c.k === 'ctl' ? corCtl(c.p) : corItem(c.it);
+    const chk = c.k === 'ctl' ? `data-ctl="${c.p.id}|${c.pkey}|${c.tkey}"` : `data-conc="${c.it.id}|${c.chave}"`;
+    const abrir = c.k === 'ctl' ? `data-selproj="${c.p.id}"` : `data-item="${c.it.id}"`;
+    return `<div class="tcard ${c.feito ? 'done' : ''}" style="--c:${cor}"><input type="checkbox" class="chk" ${chk} ${c.feito ? 'checked' : ''}>
+      <div class="tb" ${abrir}><div class="tt">${esc(c.titulo)}</div><div class="ts">${p ? esc(p.nome) : (c.k === 'item' && c.it.recorrencia ? 'Rotina' : 'Sem projeto')}${c.data ? ' · ' + (c.alerta ? 'desde ' : '') + fmtData(c.data) : ''}</div>
+      ${c.k === 'ctl' && c.acao === 'agendar' && !c.feito ? `<button class="btn sm pri" data-agendar="${c.p.id}|${c.pkey}" style="margin-top:6px">Agendar</button>` : ''}</div></div>`;
+  };
+  return `<div class="tfiltros card">
+      <input id="tfQ" placeholder="Buscar tarefa…" value="${esc(tFiltro.q)}">
+      <select id="tfProj"><option value="">Todos os projetos</option>${optsProjetos(tFiltro.proj)}</select>
+      <select id="tfCat"><option value="">Todas as categorias</option>${Object.entries(CATEGORIAS).map(([k, c]) => `<option value="${k}" ${tFiltro.cat === k ? 'selected' : ''}>${c.nome}</option>`).join('')}</select>
+      <label class="cb" style="margin:0"><input type="checkbox" id="tfRot" ${tFiltro.rotinas ? 'checked' : ''}> Mostrar rotinas</label>
+      <span class="hint" style="margin-left:auto">${vis.filter(c => !c.feito).length} em aberto</span></div>
+    <div class="quadro">${colunas.map(([t, l, cls]) => `<section class="qcol ${cls}"><h3>${t}<span>${l.length}</span></h3>${l.map(card).join('') || '<div class="empty">Nada aqui.</div>'}</section>`).join('')}</div>`;
 }
 
 function vSemana() {
@@ -1414,6 +1545,7 @@ document.addEventListener('click', async ev => {
   const ce = t.closest('[data-convite-ev]'); if (ce) { const e = modalEvento._e, sd = e.start.dateTime.slice(0, 10); return copiarTexto(textoConvite(e.subject, sd, e.isAllDay ? '' : e.start.dateTime.slice(11, 16), hm2min(e.end.dateTime.slice(11, 16)) - hm2min(e.start.dateTime.slice(11, 16)), e.onlineMeeting.joinUrl), 'Convite copiado.'); }
   if (t.matches('#modalBg')) return fecharModal();
   const nav = t.closest('#nav button'); if (nav) return irPara(nav.dataset.v);
+  const vi = t.closest('[data-v-ir]'); if (vi) return irPara(vi.dataset.vIr);
   const conc = t.closest('[data-conc]');
   if (conc) {
     const [id, d] = conc.dataset.conc.split('|'), it = D.itens.find(i => i.id === id);
@@ -1430,7 +1562,7 @@ document.addEventListener('click', async ev => {
   if (eEl) { ev.stopPropagation(); const e = eventos.find(x => x.id === eEl.dataset.ev); if (e) modalEvento(e); return; }
   const nd = t.closest('[data-novo-data]'); if (nd) return novoItem({ data: nd.dataset.novoData });
   const nt = t.closest('[data-novo-tipo]'); if (nt) return novoItem(Object.assign({ tipo: nt.dataset.novoTipo }, JSON.parse(nt.dataset.ctx)));
-  const cel = t.closest('[data-dia]'); if (cel) { refCal = parseYmd(cel.dataset.dia); modoCal = 'semana'; return render(); }
+  const cel = t.closest('[data-dia]'); if (cel) { refCal = parseYmd(cel.dataset.dia); modoCal = 'semana'; vista = 'calendario'; return render(); }
   const col = t.closest('[data-coldia]');
   if (col) { const y = ev.clientY - col.getBoundingClientRect().top; const m = Math.floor((y / PX * 60 + H0 * 60) / 30) * 30; return novoItem({ data: col.dataset.coldia, hora: min2hm(m) }); }
   const sa = t.closest('[data-selarea]'); if (sa) { selProj = { tipo: 'area', id: sa.dataset.selarea }; return render(); }
@@ -1460,6 +1592,9 @@ document.addEventListener('click', async ev => {
     case 'gEntrar': return gEntrar(!gCfg().ativo);
     case 'gSair': return gSair();
     case 'gDiag': return gDiagnostico();
+    case 'atalhoDemanda': return modalDemanda(null, tFiltro.proj || '');
+    case 'atalhoReuniao': return novoItem({ tipo: 'reuniao' });
+    case 'atalhoNovo': return novoItem();
     case 'salvarFer': { const uf = vConfig._ufVer || D.config.ufPadrao || 'RJ', cf = cfgFer(); const ls = $('#cfgFerAj').value.split('\n').map(x => x.trim()).filter(Boolean); cf.extras[uf] = ls.filter(x => x[0] === '+').map(x => x.slice(1).trim()); cf.removidos[uf] = ls.filter(x => x[0] === '-').map(x => x.slice(1).trim()); cacheFer.clear(); salvar(); toast('Feriados salvos.'); return render(); }
     case 'salvarDemanda': return salvarDemanda();
     case 'excluirDemanda': return excluirDemanda();
@@ -1519,6 +1654,9 @@ document.addEventListener('change', ev => {
   }
   if (t.matches('[data-areacal]')) { area(t.dataset.areacal).calendarioId = t.value; salvar(); return; }
   if (t.id === 'cfgCalPad') { D.config.calendarioPadrao = t.value; salvar(); }
+  if (t.id === 'tfProj') { tFiltro.proj = t.value; return render(); }
+  if (t.id === 'tfCat') { tFiltro.cat = t.value; return render(); }
+  if (t.id === 'tfRot') { tFiltro.rotinas = t.checked; return render(); }
   if (t.name === 'estEv') { D.config.estiloEventos = t.value; salvar(); return render(); }
   if (t.id === 'cfgUF') { D.config.ufPadrao = t.value; cacheFer.clear(); salvar(); return render(); }
   if (t.id === 'cfgUFver') { vConfig._ufVer = t.value; return render(); }
@@ -1528,6 +1666,9 @@ document.addEventListener('change', ev => {
   if (t.id === 'cfgNotif') { D.config.notificacoes = t.checked; salvar(); if (t.checked) pedirNotif(); }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(); });
+document.addEventListener('input', e => {
+  if (e.target.id === 'tfQ') { tFiltro.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#tfQ'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }
+});
 $('#btnNovo').onclick = () => novoItem();
 function aplicarMini(m) { document.body.classList.toggle('mini', m); $('#btnMini').textContent = m ? '»' : '«'; try { localStorage.setItem('menuMini', m ? '1' : '0'); } catch { } if (D) renderStatus(); }
 $('#btnMini').onclick = () => aplicarMini(!document.body.classList.contains('mini'));
