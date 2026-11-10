@@ -2080,7 +2080,13 @@ function optsProjetos(sel) {
 }
 function calPadraoProjeto(pid) {
   const p = projeto(pid), a = p && area(p.areaId);
-  return (a && a.calendarioId) || D.config.ultimoCal || '@principal';
+  if (p && p.agendaDemanda) return p.agendaDemanda;
+  if (a && a.calendarioId) return a.calendarioId;
+  // agenda com o mesmo nome da empresa (ex.: "JF", "SIGO", "Pessoal")
+  const n = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const c = a && todosCals().find(k => n(k.nome) === n(a.nome) || (n(a.nome) === 'rnunes' && k.padrao));
+  if (c) return c.padrao ? '@principal' : c.id;
+  return D.config.ultimoCal || '@principal';
 }
 function modalDemanda(it, pid) {
   const novo = !it;
@@ -2088,24 +2094,25 @@ function modalDemanda(it, pid) {
   const aviso = it && it.avisoId ? D.itens.find(i => i.id === it.avisoId) : null;
   const lemb = (it && it.lembrarEm) || '';
   const proj = (it && it.projetoId) || pid || '';
-  const calSel = (aviso && aviso.calendarioId) || calPadraoProjeto(proj);
-  const cals = todosCals().filter(k => k.podeEditar);
+  const calSel = (it && it.calendarioId) || calPadraoProjeto(proj);
+  const cals = todosCals();
   const optsCal = (cals.some(k => k.padrao) ? '' : `<option value="@principal">Outlook · Calendário principal</option>`) +
-    cals.map(k => { const v = k.padrao ? '@principal' : k.id; return `<option value="${esc(v)}" ${calSel === v || (k.padrao && !calSel) ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}</option>`; }).join('');
+    cals.map(k => { const v = k.padrao ? '@principal' : k.id; return `<option value="${esc(v)}" ${calSel === v || (k.padrao && !calSel) ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}${k.podeEditar ? '' : ' (só leitura)'}</option>`; }).join('');
   abrirModal(`<h3>${novo ? 'Nova demanda' : 'Demanda'}</h3>
-    <div class="f"><label>Projeto / obra</label><select id="dProj">${proj ? '' : '<option value="">— escolha —</option>'}${optsProjetos(proj)}</select></div>
+    <div class="fr"><div class="f"><label>Projeto / obra</label><select id="dProj">${proj ? '' : '<option value="">— escolha —</option>'}${optsProjetos(proj)}</select></div>
+      <div class="f"><label>Agenda (define a cor)</label><div style="display:flex;gap:6px;align-items:center"><span class="sw" id="dCalSw" style="width:14px;height:14px;background:${corDoCal(calSel) || '#64748b'}"></span><select id="dCal" style="flex:1">${optsCal}</select></div></div></div>
     <div class="f"><label>O que precisa ser feito</label><textarea id="dTit" style="min-height:60px" placeholder="Ex.: Enviar cronograma revisado para o cliente">${esc(it ? it.titulo : '')}</textarea></div>
     <div class="fr"><div class="f"><label>Entregar até</label><input type="date" id="dPrazo" value="${it ? it.data : ''}"></div>
       <div class="f"><label>Lembrar em (opcional)</label><div style="display:flex;gap:6px"><input type="date" id="dLembD" value="${lemb.slice(0, 10)}" style="flex:1"><input type="time" id="dLembH" value="${lemb.slice(11, 16) || '09:00'}" style="width:110px"></div></div></div>
     <div class="box"><label class="cb" style="margin:0"><input type="checkbox" id="dAviso" ${!it || aviso ? 'checked' : ''}> Avisar também pela agenda (celular)</label>
-      <div class="f" style="margin:8px 0 0"><label>Agenda do aviso</label><select id="dCal">${optsCal}</select></div>
-      <div class="hint" style="margin-top:4px">Cria um evento curto "⏰ Lembrete" no dia e horário do lembrete, que notifica pelo app do Outlook ou do Google.</div></div>
+
+      <div class="hint" style="margin-top:4px">Cria um evento curto "⏰ Lembrete" na agenda escolhida, no dia e horário do lembrete, que notifica pelo app do Outlook ou do Google. O prazo em si não vai para a agenda.</div></div>
     ${it ? `<label class="cb"><input type="checkbox" id="dFeito" ${it.concluidas[it.data] ? 'checked' : ''}> Concluída</label>` : ''}
     <div class="acts">${novo ? '' : '<button class="btn dan l" data-acao="excluirDemanda">Excluir</button>'}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarDemanda">Salvar</button></div>`);
   modalDemanda._it = it;
-  $('#dProj').addEventListener('change', () => { if (!aviso) $('#dCal').value = calPadraoProjeto($('#dProj').value); });
-  const avisoVis = () => { $('#dCal').closest('.f').style.display = $('#dAviso').checked ? '' : 'none'; };
-  $('#dAviso').addEventListener('change', avisoVis); avisoVis();
+  const sw = () => { $('#dCalSw').style.background = corDoCal($('#dCal').value) || '#64748b'; };
+  $('#dProj').addEventListener('change', () => { if (!it) { $('#dCal').value = calPadraoProjeto($('#dProj').value); sw(); } });
+  $('#dCal').addEventListener('change', sw);
   setTimeout(() => $('#dTit').focus(), 30);
 }
 async function salvarDemanda() {
@@ -2117,7 +2124,8 @@ async function salvarDemanda() {
   let it = modalDemanda._it;
   if (!it) { it = novoItemBase({ tipo: 'entrega', demanda: true }); D.itens.push(it); }
   const prazoAntigo = it.data;
-  Object.assign(it, { titulo: tit, projetoId: pid, areaId: p.areaId, data: prazo, hora: '', recorrencia: null, lembrarEm, sincronizar: false, calendarioId: calPadraoProjeto(pid) });
+  Object.assign(it, { titulo: tit, projetoId: pid, areaId: p.areaId, data: prazo, hora: '', recorrencia: null, lembrarEm, sincronizar: false, calendarioId: $('#dCal').value });
+  p.agendaDemanda = $('#dCal').value;
   if ($('#dFeito')) { delete it.concluidas[prazoAntigo]; if ($('#dFeito').checked) it.concluidas[prazo] = true; else delete it.concluidas[prazo]; }
   // aviso na agenda
   let aviso = it.avisoId ? D.itens.find(i => i.id === it.avisoId) : null;
@@ -2125,7 +2133,7 @@ async function salvarDemanda() {
   fecharModal();
   if (querAviso) {
     if (!aviso) { aviso = novoItemBase({ tipo: 'tarefa', avisoDe: it.id }); D.itens.push(aviso); it.avisoId = aviso.id; }
-    Object.assign(aviso, { titulo: '⏰ Lembrete: ' + tit, projetoId: pid, areaId: p.areaId, data: lembrarEm.slice(0, 10), hora: lembrarEm.slice(11, 16), duracao: 15, lembrete: 0, sincronizar: true, calendarioId: $('#dCal').value, showAs: 'free', notas: `Prazo: ${fmtData(prazo)}`, _pend: true });
+    Object.assign(aviso, { titulo: '⏰ Lembrete: ' + tit, projetoId: pid, areaId: p.areaId, data: lembrarEm.slice(0, 10), hora: lembrarEm.slice(11, 16), duracao: 15, lembrete: 0, sincronizar: true, calendarioId: ((calObj($('#dCal').value) || {}).podeEditar ? $('#dCal').value : '@principal'), showAs: 'free', notas: `Prazo: ${fmtData(prazo)}`, _pend: true });
     salvar(); render();
     await sincronizar(aviso);
   } else if (aviso) {
