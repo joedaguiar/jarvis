@@ -162,8 +162,12 @@ body.mini #outlookStatus .dot{margin:3px}
 .wk .hd.hoje .dw{color:var(--coral)}
 .wk .ad{min-width:0;overflow:hidden;border-bottom:1px solid var(--linha);min-height:34px;padding:3px;border-left:1px solid var(--line-2)}
 .wk .hrs{position:relative}
-.wk .hr:first-child{transform:translateY(2px)}
-.wk .hd .adchip{width:100%;margin-top:3px;text-align:left}
+.wk .hr:first-child{visibility:hidden}
+.wk .hd{position:relative}
+.hdots{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;gap:6px;align-items:center;max-width:45%;flex-wrap:wrap;justify-content:flex-end}
+.hdots .pd{width:9px;height:9px;border-radius:50%;cursor:pointer;display:block}
+.hdots .pd.ok{opacity:.35}
+.hdots b{font-size:10px;color:var(--muted)}
 .wk .hr{height:var(--px,48px);font-size:11px;color:var(--muted);text-align:right;padding-right:6px;transform:translateY(-7px);font-variant-numeric:tabular-nums}
 .wk .col{position:relative;border-left:1px solid var(--line-2);background:repeating-linear-gradient(transparent 0 calc(var(--px,48px) - 1px),var(--line-2) calc(var(--px,48px) - 1px) var(--px,48px))}
 .wk .col.hoje{background:repeating-linear-gradient(rgba(232,105,63,.05) 0 calc(var(--px,48px) - 1px),#f1e2d9 calc(var(--px,48px) - 1px) var(--px,48px))}
@@ -1199,7 +1203,8 @@ function vCalendario() {
   let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent, '52px')};--px:${PX}px"><div class="hd"></div>`;
   for (let i = 0; i < 7; i++) {
     const dd = addDays(ini, i), d = ymd(dd), dt = ent.filter(x => x.data === d && !x.hora);
-    g += `<div class="hd ${d === hs ? 'hoje' : ''}"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${dt.map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc(x.titulo)}">${tituloHtml(x)}</div>`).join('')}</div>`;
+    const pts = dt.map(x => { const p = projetoDaEntrada(x), cp = p ? tagProjeto(p).cor : x.cor; return `<i class="pd ${x.feito ? 'ok' : ''}" style="background:${cp};box-shadow:0 0 0 2px #fff,0 0 0 3.5px ${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc((p ? tagProjeto(p).nome + ' · ' : '') + x.titulo)}"></i>`; });
+    g += `<div class="hd ${d === hs ? 'hoje' : ''}"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${pts.length ? `<span class="hdots">${pts.slice(0, 6).join('')}${pts.length > 6 ? `<b>+${pts.length - 6}</b>` : ''}</span>` : ''}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
