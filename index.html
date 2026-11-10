@@ -593,6 +593,14 @@ function escurecer(hex, f) {
 }
 // eventos com fundo claro da cor da agenda + filete forte à esquerda: texto escuro e legível
 function estiloSA(sa, cor) {
+  if ((D && D.config.estiloEventos) !== 'claro') {
+    // cor forte com texto branco (estilo original)
+    if (sa === 'tentative') return `background:repeating-linear-gradient(135deg,${cor} 0 6px,${clarear(cor, .4)} 6px 12px);color:#fff;text-shadow:0 0 3px rgba(0,0,0,.5);`;
+    if (sa === 'free') return `background:#fff;border:1px solid ${cor};border-left:3px solid ${cor};color:${escurecer(cor, .45)};`;
+    if (sa === 'oof') return `background:${cor};box-shadow:inset 4px 0 0 #5c2e91;color:#fff;`;
+    if (sa === 'workingElsewhere') return `background:${cor};border:1px dashed #fff;color:#fff;`;
+    return `background:${cor};color:#fff;`;
+  }
   const fundo = clarear(cor, .8), txt = escurecer(cor, .55);
   if (sa === 'tentative') return `background:repeating-linear-gradient(135deg,${fundo} 0 6px,#fff 6px 11px);border-left:3px dashed ${cor};color:${txt};`;
   if (sa === 'free') return `background:#fff;border:1px solid ${clarear(cor, .4)};border-left:3px solid ${cor};color:${txt};`;
@@ -1168,6 +1176,9 @@ function vConfig() {
       <p class="hint">Se uma empresa tiver um calendário vinculado (do Outlook ou do Google), os eventos desse calendário ganham a cor da empresa, e os itens dela são gravados lá (quando você tem permissão de edição).</p>
     </div></div><div>
     <div class="card"><h3>Calendários exibidos</h3>${cals}<p class="hint">Agendas com o mesmo <b>grupo</b> aparecem como uma só no filtro do topo.</p></div>
+    <div class="card"><h3>Aparência dos eventos</h3>
+      <label class="cb"><input type="radio" name="estEv" value="solido" ${D.config.estiloEventos !== 'claro' ? 'checked' : ''}> Cor forte, texto branco</label>
+      <label class="cb"><input type="radio" name="estEv" value="claro" ${D.config.estiloEventos === 'claro' ? 'checked' : ''}> Fundo claro com filete colorido, texto escuro</label></div>
     <div class="card"><h3>Lembretes</h3>
       <div class="f"><label>Lembrete padrão (minutos antes)</label><input type="number" id="cfgLemb" min="0" value="${c.lembretePadrao}"></div>
       <label class="cb"><input type="checkbox" id="cfgNotif" ${c.notificacoes ? 'checked' : ''}> Notificações do Windows para itens que não estão no Outlook</label>
@@ -1508,6 +1519,7 @@ document.addEventListener('change', ev => {
   }
   if (t.matches('[data-areacal]')) { area(t.dataset.areacal).calendarioId = t.value; salvar(); return; }
   if (t.id === 'cfgCalPad') { D.config.calendarioPadrao = t.value; salvar(); }
+  if (t.name === 'estEv') { D.config.estiloEventos = t.value; salvar(); return render(); }
   if (t.id === 'cfgUF') { D.config.ufPadrao = t.value; cacheFer.clear(); salvar(); return render(); }
   if (t.id === 'cfgUFver') { vConfig._ufVer = t.value; return render(); }
   if (t.id === 'cfgCarnaval') { cfgFer().carnaval = t.checked; cacheFer.clear(); salvar(); return render(); }
