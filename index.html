@@ -33,15 +33,18 @@ a{color:var(--salvia-esc)}
 #side nav button:hover{background:rgba(255,255,255,.55)}
 #side nav button.on{background:var(--papel);color:var(--ink);box-shadow:var(--sombra)}
 #side nav button.on .ico{color:var(--coral)}
-#side .ico{width:18px;text-align:center;font-size:15px}
+#side .ico{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+#side h1{display:flex;align-items:center;gap:8px}
+#side .logo{display:inline-flex;color:var(--coral)}
+#btnMini{display:flex;justify-content:center}
 #side .grow{flex:1}
 #btnMini{background:none;border:0;color:#7d8a90;font-size:16px;padding:8px;margin-top:6px;border-radius:10px}
 #btnMini:hover{background:rgba(255,255,255,.55)}
 body.mini #side{width:62px;padding:14px 8px}
 body.mini #side .tx{display:none}
-body.mini #side h1{margin:2px 0 16px;text-align:center}
+body.mini #side h1{margin:2px 0 16px;justify-content:center}
 body.mini #side nav button{justify-content:center;padding:11px 0}
-body.mini #side .ico{font-size:17px;width:auto}
+
 body.mini #outlookStatus{padding:8px 0;text-align:center;background:none;box-shadow:none}
 body.mini #outlookStatus .det{display:none}
 body.mini #outlookStatus .dot{margin:3px}
@@ -156,6 +159,7 @@ body.mini #outlookStatus .dot{margin:3px}
 .wk .hd.hoje .dw{color:var(--coral)}
 .wk .ad{min-width:0;overflow:hidden;border-bottom:1px solid var(--linha);min-height:28px;padding:3px;border-left:1px solid var(--line-2)}
 .wk .hrs{position:relative}
+.wk .hr:first-child{visibility:hidden}
 .wk .hr{height:48px;font-size:11px;color:var(--muted);text-align:right;padding-right:6px;transform:translateY(-7px);font-variant-numeric:tabular-nums}
 .wk .col{position:relative;border-left:1px solid var(--line-2);background:repeating-linear-gradient(transparent 0 47px,var(--line-2) 47px 48px)}
 .wk .col.hoje{background:repeating-linear-gradient(rgba(232,105,63,.05) 0 47px,#f1e2d9 47px 48px)}
@@ -228,7 +232,16 @@ body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemand
   #side nav button,body.mini #side nav button{flex-direction:column;gap:1px;padding:8px 10px;width:auto;margin:0}
   #main{order:1;min-height:0}
   #top{padding:10px 12px 6px;gap:6px}
-  #top h2{width:100%}
+  #top h2{font-size:19px}
+  #btnReuniao{display:none}
+  #top .btn{padding:6px 11px}
+  .cal-head{gap:6px}
+  .cal-head .lbl{order:-1;width:100%;margin:0 0 2px;min-width:0;font-size:17px}
+  #atualizado{display:none}
+  .adtx{display:none}
+  .wk{--cols:34px repeat(7,minmax(0,1fr))!important}
+  .wk .hd{padding:6px 1px 4px}
+  .wk .hr{font-size:9.5px;padding-right:3px}
   #view{padding:4px 10px 24px}
   .grid2,.proj-wrap{grid-template-columns:1fr}
   .semana{grid-template-columns:1fr}
@@ -245,14 +258,14 @@ body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemand
 <body>
 <div id="app">
 <aside id="side">
-  <h1><span>✔</span><span class="tx"> Meus Afazeres</span></h1>
+  <h1><span class="logo"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5.5"/><path d="M8 12.4l2.8 2.8L16.4 9.4"/></svg></span><span class="tx">Meus Afazeres</span></h1>
   <nav id="nav">
-    <button data-v="painel" title="Painel"><span class="ico">⌂</span><span class="tx">Painel</span></button>
-    <button data-v="calendario" title="Calendário"><span class="ico">▦</span><span class="tx">Calendário</span></button>
-    <button data-v="semana" title="Semana"><span class="ico">▤</span><span class="tx">Semana</span></button>
-    <button data-v="tarefas" title="Tarefas"><span class="ico">☑</span><span class="tx">Tarefas</span></button>
-    <button data-v="projetos" title="Empresas e projetos"><span class="ico">◧</span><span class="tx">Empresas e projetos</span></button>
-    <button data-v="config" title="Configurações"><span class="ico">⚙</span><span class="tx">Configurações</span></button>
+    <button data-v="painel" title="Painel"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="9" rx="2"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="2"/><rect x="13.5" y="11.5" width="7.5" height="9.5" rx="2"/><rect x="3" y="15" width="7.5" height="6" rx="2"/></svg></span><span class="tx">Painel</span></button>
+    <button data-v="calendario" title="Calendário"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/></svg></span><span class="tx">Calendário</span></button>
+    <button data-v="semana" title="Semana"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16.5" rx="3"/><path d="M9 4v16.5M15 4v16.5"/></svg></span><span class="tx">Semana</span></button>
+    <button data-v="tarefas" title="Tarefas"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5l1.8 1.8L9.2 5M4 13.5l1.8 1.8L9.2 12"/><path d="M12.5 7h7.5M12.5 14h7.5M4.5 19.5h15.5"/></svg></span><span class="tx">Tarefas</span></button>
+    <button data-v="projetos" title="Empresas e projetos"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2h7.5A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><path d="M8 11.5v4.5M12 11.5v2.5M16 11.5v3.5"/></svg></span><span class="tx">Empresas e projetos</span></button>
+    <button data-v="config" title="Configurações"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h9M17.5 6.5H20M4 12h3M11.5 12H20M4 17.5h11M19 17.5h1"/><circle cx="15.5" cy="6.5" r="2"/><circle cx="9.5" cy="12" r="2"/><circle cx="17" cy="17.5" r="2"/></svg></span><span class="tx">Configurações</span></button>
   </nav>
   <div class="grow"></div>
   <div id="outlookStatus"></div>
@@ -1178,7 +1191,7 @@ function vCalendario() {
   const ent = entradas(ini, fim), ctlCal = controleEntre(ini, fim);
   let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent.concat(ctlCal), '52px')}"><div class="hd"></div>`;
   for (let i = 0; i < 7; i++) { const dd = addDays(ini, i); g += `<div class="hd ${ymd(dd) === hs ? 'hoje' : ''}"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span></div>`; }
-  g += `<div class="ad" style="border-left:0;font-size:10px;color:var(--muted);padding-top:6px;text-align:right">dia todo</div>`;
+  g += `<div class="ad" style="border-left:0;font-size:10px;color:var(--muted);padding-top:6px;text-align:right"><span class="adtx">dia todo</span></div>`;
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i));
     const cd = ctlCal.filter(x => x.data === d), porP = {}; cd.forEach(x => { (porP[x.p.id] = porP[x.p.id] || []).push(x); });
@@ -1670,7 +1683,7 @@ document.addEventListener('input', e => {
   if (e.target.id === 'tfQ') { tFiltro.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#tfQ'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }
 });
 $('#btnNovo').onclick = () => novoItem();
-function aplicarMini(m) { document.body.classList.toggle('mini', m); $('#btnMini').textContent = m ? '»' : '«'; try { localStorage.setItem('menuMini', m ? '1' : '0'); } catch { } if (D) renderStatus(); }
+function aplicarMini(m) { document.body.classList.toggle('mini', m); $('#btnMini').innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${m ? 'M7 6l6 6-6 6M13 6l6 6-6 6' : 'M17 6l-6 6 6 6M11 6l-6 6 6 6'}"/></svg>`; try { localStorage.setItem('menuMini', m ? '1' : '0'); } catch { } if (D) renderStatus(); }
 $('#btnMini').onclick = () => aplicarMini(!document.body.classList.contains('mini'));
 aplicarMini((() => { try { return localStorage.getItem('menuMini') !== '0'; } catch { return true; } })());
 $('#btnReuniao').onclick = () => novoItem({ tipo: 'reuniao' });
