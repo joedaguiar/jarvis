@@ -80,8 +80,8 @@ body.mini #outlookStatus .dot{margin:3px}
 .row.done .t{text-decoration:line-through;color:var(--muted)}
 .chk{width:18px;height:18px;flex:none;accent-color:var(--salvia);cursor:pointer}
 .tag{font-size:11px;border-radius:6px;padding:1px 7px;background:#ece7de;color:#5c6870;margin-left:6px;white-space:nowrap;font-weight:600}
-.otag{display:inline-block;font-size:10.5px;font-weight:800;padding:0 6px;border-radius:5px;margin-right:5px;line-height:16px;vertical-align:1px;white-space:nowrap;box-shadow:0 0 0 1px rgba(255,255,255,.75);letter-spacing:.1px}
-.ev .otag{margin-bottom:1px}
+.otag{display:inline;font-size:10px;font-weight:700;padding:0 7px 0 5px;border-radius:999px;margin:1px 5px 1px 1px;line-height:15px;vertical-align:1px;white-space:nowrap;letter-spacing:.1px}
+.otag i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:1px}
 .tag.ol{background:var(--accent-soft);color:var(--salvia-esc)}
 .tag.err{background:#fbe3df;color:var(--danger)}
 .tag.late{background:var(--coral-soft);color:var(--warn)}
@@ -160,13 +160,14 @@ body.mini #outlookStatus .dot{margin:3px}
 .wk .hd .dn{font-weight:800;font-size:19px;color:var(--ink)}
 .wk .hd.hoje .dn{color:#fff;background:var(--coral);border-radius:999px;min-width:30px;padding:0 7px}
 .wk .hd.hoje .dw{color:var(--coral)}
-.wk .ad{min-width:0;overflow:hidden;border-bottom:1px solid var(--linha);min-height:28px;padding:3px;border-left:1px solid var(--line-2)}
+.wk .ad{min-width:0;overflow:hidden;border-bottom:1px solid var(--linha);min-height:34px;padding:3px;border-left:1px solid var(--line-2)}
 .wk .hrs{position:relative}
-.wk .hr:first-child{visibility:hidden}
-.wk .hr{height:48px;font-size:11px;color:var(--muted);text-align:right;padding-right:6px;transform:translateY(-7px);font-variant-numeric:tabular-nums}
-.wk .col{position:relative;border-left:1px solid var(--line-2);background:repeating-linear-gradient(transparent 0 47px,var(--line-2) 47px 48px)}
-.wk .col.hoje{background:repeating-linear-gradient(rgba(232,105,63,.05) 0 47px,#f1e2d9 47px 48px)}
-.ev{position:absolute;border-radius:8px;padding:3px 6px;font-size:12px;overflow:hidden;cursor:pointer;line-height:1.28;color:var(--ink)}
+.wk .hr{height:var(--px,48px);font-size:11px;color:var(--muted);text-align:right;padding-right:6px;transform:translateY(-7px);font-variant-numeric:tabular-nums}
+.wk .col{position:relative;border-left:1px solid var(--line-2);background:repeating-linear-gradient(transparent 0 calc(var(--px,48px) - 1px),var(--line-2) calc(var(--px,48px) - 1px) var(--px,48px))}
+.wk .col.hoje{background:repeating-linear-gradient(rgba(232,105,63,.05) 0 calc(var(--px,48px) - 1px),#f1e2d9 calc(var(--px,48px) - 1px) var(--px,48px))}
+.ev{position:absolute;border-radius:7px;padding:2px 5px;font-size:11.5px;overflow:hidden;cursor:pointer;line-height:1.3;color:var(--ink);word-break:break-word}
+.ev.curto{white-space:nowrap;text-overflow:ellipsis;line-height:1.2;padding-top:1px}
+.ev b{margin-right:3px}
 .ev b{font-weight:700;font-variant-numeric:tabular-nums}
 .ev.done{opacity:.45}
 .ev.movel{cursor:grab;touch-action:none}
@@ -1162,7 +1163,7 @@ function vSemana() {
   return html + '</div>';
 }
 
-const H0 = 5, H1 = 24, PX = 48;
+const H0 = 6, H1 = 21; let PX = 40; // altura de 1 hora; ajustada para caber das 6h às 21h na tela
 function colunasSemana(ini, ent, prefixo) {
   const cols = [];
   for (let i = 0; i < 7; i++) {
@@ -1180,11 +1181,11 @@ function vCalendario() {
   if (modoCal === 'mes') {
     const m0 = new Date(refCal.getFullYear(), refCal.getMonth(), 1), ini = domingo(m0), fim = addDays(ini, 41);
     carregarEventos(ini, fim);
-    const ent = entradas(ini, fim), ctlMes = controleEntre(ini, fim);
+    const ent = entradas(ini, fim);
     let g = `<div class="mes">${[0, 1, 2, 3, 4, 5, 6].map(i => `<div class="hd">${DIAS[i]}</div>`).join('')}`;
     for (let i = 0; i < 42; i++) {
-      const dd = addDays(ini, i), d = ymd(dd), l = ent.filter(x => x.data === d), nCtl = ctlMes.filter(x => x.data === d && !x.feito).length;
-      g += `<div class="cel ${dd.getMonth() !== m0.getMonth() ? 'fora' : ''} ${d === hs ? 'hoje' : ''}" data-dia="${d}"><span class="n">${dd.getDate()}</span>${nCtl ? `<span class="tag" title="Pendências de controle" style="float:right">📋 ${nCtl}</span>` : ''}
+      const dd = addDays(ini, i), d = ymd(dd), l = ent.filter(x => x.data === d);
+      g += `<div class="cel ${dd.getMonth() !== m0.getMonth() ? 'fora' : ''} ${d === hs ? 'hoje' : ''}" data-dia="${d}"><span class="n">${dd.getDate()}</span>
         ${l.slice(0, 4).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? x.hora + ' ' : ''}${tituloHtml(x)}</div>`).join('')}
         ${l.length > 4 ? `<div class="mais">+${l.length - 4} mais</div>` : ''}</div>`;
     }
@@ -1192,25 +1193,23 @@ function vCalendario() {
   }
   const ini = domingo(refCal), fim = addDays(ini, 6);
   carregarEventos(ini, fim);
-  const ent = entradas(ini, fim), ctlCal = controleEntre(ini, fim);
-  let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent.concat(ctlCal), '52px')}"><div class="hd"></div>`;
+  const ent = entradas(ini, fim);
+  let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent, '52px')};--px:${PX}px"><div class="hd"></div>`;
   for (let i = 0; i < 7; i++) { const dd = addDays(ini, i); g += `<div class="hd ${ymd(dd) === hs ? 'hoje' : ''}"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span></div>`; }
   g += `<div class="ad" style="border-left:0;font-size:10px;color:var(--muted);padding-top:6px;text-align:right"><span class="adtx">dia todo</span></div>`;
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i));
-    const cd = ctlCal.filter(x => x.data === d), porP = {}; cd.forEach(x => { (porP[x.p.id] = porP[x.p.id] || []).push(x); });
-    const chipsCtl = Object.values(porP).map(l => { const pend = l.filter(x => !x.feito).length; return `<div class="adchip" style="background:#fff;color:var(--ink);border:1px dashed ${tagProjeto(l[0].p).cor};${pend ? '' : 'opacity:.45'}" data-selproj="${l[0].p.id}" title="${esc(l.map(x => (x.feito ? '✓ ' : '• ') + x.titulo).join('\n'))}">${tagHtml(l[0].p)}${pend ? pend + ' pendência' + (pend > 1 ? 's' : '') : '✓'}</div>`; }).join('');
-    g += `<div class="ad">${chipsCtl}${ent.filter(x => x.data === d && !x.hora).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${tituloHtml(x)}</div>`).join('')}</div>`;
+    g += `<div class="ad">${ent.filter(x => x.data === d && !x.hora).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${tituloHtml(x)}</div>`).join('')}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i));
     const evs = layout(ent.filter(x => x.data === d && x.hora));
     g += `<div class="col ${d === hs ? 'hoje' : ''}" data-coldia="${d}" style="height:${(H1 - H0) * PX}px">${evs.map(x => {
-      const s = Math.max(hm2min(x.hora), H0 * 60), e = Math.max(Math.min(hm2min(x.fim || x.hora) || s + 30, H1 * 60), s + 20);
+      const s = Math.min(Math.max(hm2min(x.hora), H0 * 60), H1 * 60 - 20), e = Math.max(Math.min(hm2min(x.fim || x.hora) || s + 30, H1 * 60), s + 20);
       const top = (s - H0 * 60) / 60 * PX, h = (e - s) / 60 * PX - 2;
       const movel = x.k === 'item' ? !x.it.leitura : (x.e._cal.podeEditar && !x.e.isAllDay);
-      return `<div class="ev ${x.feito ? 'done' : ''} ${movel ? 'movel' : ''}" title="${esc(x.titulo + (x.sa && SHOWAS[x.sa] ? ' · ' + SHOWAS[x.sa] : ''))}" style="top:${top}px;height:${h}px;left:calc(${x._c / x._n * 100}% + 1px);width:calc(${100 / x._n}% - 3px);${estiloSA(x.sa, x.cor)}" ${x.k === 'item' ? `data-item="${x.it.id}" data-orig="${x.orig}"` : `data-ev="${esc(x.e.id)}"`} data-ini="${hm2min(x.hora)}" data-dur="${hm2min(x.fim || x.hora) - hm2min(x.hora)}" data-dia="${x.data}"><b>${x.hora}</b> ${tituloHtml(x)}${movel ? '<div class="rs"></div>' : ''}</div>`;
+      return `<div class="ev ${x.feito ? 'done' : ''} ${movel ? 'movel' : ''} ${h < PX * 1.3 ? 'curto' : ''}" title="${esc(x.titulo + (x.sa && SHOWAS[x.sa] ? ' · ' + SHOWAS[x.sa] : ''))}" style="top:${top}px;height:${h}px;left:calc(${x._c / x._n * 100}% + 1px);width:calc(${100 / x._n}% - 3px);${estiloSA(x.sa, x.cor)}" ${x.k === 'item' ? `data-item="${x.it.id}" data-orig="${x.orig}"` : `data-ev="${esc(x.e.id)}"`} data-ini="${hm2min(x.hora)}" data-dur="${hm2min(x.fim || x.hora) - hm2min(x.hora)}" data-dia="${x.data}"><b>${x.hora}</b> ${tituloHtml(x)}${movel ? '<div class="rs"></div>' : ''}</div>`;
     }).join('')}${d === hs ? `<div class="nowline" id="nowline"></div>` : ''}</div>`;
   }
   return head.replace('<span class="lbl" id="calLbl"></span>', `<span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span>`) + g + '</div>';
@@ -1230,8 +1229,14 @@ function layout(lst) {
   return ev;
 }
 function posicionarCalendario() {
+  const hrs = $('.wk .hrs');
+  if (hrs) {
+    const livre = window.innerHeight - hrs.getBoundingClientRect().top - (window.innerWidth <= 820 ? 70 : 34) + $('#view').scrollTop;
+    const novo = Math.max(26, Math.min(64, Math.floor(livre / (H1 - H0))));
+    if (Math.abs(novo - PX) >= 1 && !posicionarCalendario._ajustando) { PX = novo; posicionarCalendario._ajustando = true; render(); posicionarCalendario._ajustando = false; return; }
+  }
   const n = new Date(), nl = $('#nowline');
-  if (nl) nl.style.top = ((n.getHours() * 60 + n.getMinutes() - H0 * 60) / 60 * PX) + 'px';
+  if (nl) { const m = n.getHours() * 60 + n.getMinutes(); nl.style.display = m < H0 * 60 || m > H1 * 60 ? 'none' : ''; nl.style.top = ((m - H0 * 60) / 60 * PX) + 'px'; }
 }
 
 function vProjetos() {
@@ -1694,6 +1699,7 @@ document.addEventListener('input', e => {
   if (e.target.id === 'tfQ') { tFiltro.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#tfQ'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }
 });
 $('#btnNovo').onclick = () => novoItem();
+let tResize; window.addEventListener('resize', () => { clearTimeout(tResize); tResize = setTimeout(() => { if (vista === 'calendario' && modoCal === 'semana') render(); }, 150); });
 function aplicarMini(m) { document.body.classList.toggle('mini', m); $('#btnMini').innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${m ? 'M7 6l6 6-6 6M13 6l6 6-6 6' : 'M17 6l-6 6 6 6M11 6l-6 6 6 6'}"/></svg>`; try { localStorage.setItem('menuMini', m ? '1' : '0'); } catch { } if (D) renderStatus(); }
 $('#btnMini').onclick = () => aplicarMini(!document.body.classList.contains('mini'));
 aplicarMini((() => { try { return localStorage.getItem('menuMini') !== '0'; } catch { return true; } })());
@@ -2001,7 +2007,7 @@ function tagProjeto(p) {
   return { nome: p.tag || pt.obra, cor: p.corTag || corConstrutora(pt.construtora) || (a && a.cor) || '#64748b', construtora: pt.construtora };
 }
 function corTexto(hex) { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return '#fff'; const n = parseInt(m[1], 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)); return l > 170 ? '#3b2f00' : '#fff'; }
-function tagHtml(p) { const t = tagProjeto(p); return `<span class="otag" style="background:${t.cor};color:${corTexto(t.cor)}" title="${esc(p.nome)}">${esc(t.nome)}</span>`; }
+function tagHtml(p) { const t = tagProjeto(p); return `<span class="otag" style="background:${clarear(t.cor, .84)};color:${escurecer(t.cor, .5)}" title="${esc(p.nome)}"><i style="background:${t.cor}"></i>${esc(t.nome)}</span>`; }
 // palavras que identificam cada projeto (nome da obra + apelidos)
 let chavesCache = null, chavesAssin = '';
 function chavesProjetos() {
