@@ -676,10 +676,13 @@ function clarear(hex, f) {
 }
 const ehReuniao = e => !!(e.isOnlineMeeting || (e.attendees && e.attendees.length) || e.onlineMeeting);
 function corEvento(e, base) {
-  if (e.categories && e.categories.length && categorias) { const c = e.categories.map(n => categorias[n]).find(Boolean); if (c) return c; }
-  if (e.gColor && GCORES[e.gColor]) return GCORES[e.gColor];
-  if (e._cal.padrao && ehReuniao(e)) return clarear(base, estiloEv() === 'solido' ? 0.4 : 0.28);
-  return base;
+  let cor = base;
+  // categorias com o nome das empresas foram colocadas pelo próprio sistema antes: ignora
+  const nomesArea = new Set(D.areas.map(a => a.nome));
+  if (e.categories && e.categories.length && categorias) { const c = e.categories.filter(n => !nomesArea.has(n)).map(n => categorias[n]).find(Boolean); if (c) cor = c; }
+  else if (e.gColor && GCORES[e.gColor]) cor = GCORES[e.gColor];
+  if (e._cal.padrao && ehReuniao(e)) return clarear(cor, estiloEv() === 'solido' ? 0.4 : 0.28);
+  return cor;
 }
 const SHOWAS = { free: 'Livre', tentative: 'Provisório', busy: 'Ocupado', oof: 'Ausência temporária', workingElsewhere: 'Trabalhando em outro lugar' };
 function escurecer(hex, f) {
