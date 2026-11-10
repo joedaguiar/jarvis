@@ -80,6 +80,8 @@ body.mini #outlookStatus .dot{margin:3px}
 .row.done .t{text-decoration:line-through;color:var(--muted)}
 .chk{width:18px;height:18px;flex:none;accent-color:var(--salvia);cursor:pointer}
 .tag{font-size:11px;border-radius:6px;padding:1px 7px;background:#ece7de;color:#5c6870;margin-left:6px;white-space:nowrap;font-weight:600}
+.otag{display:inline-block;font-size:10.5px;font-weight:800;padding:0 6px;border-radius:5px;margin-right:5px;line-height:16px;vertical-align:1px;white-space:nowrap;box-shadow:0 0 0 1px rgba(255,255,255,.75);letter-spacing:.1px}
+.ev .otag{margin-bottom:1px}
 .tag.ol{background:var(--accent-soft);color:var(--salvia-esc)}
 .tag.err{background:#fbe3df;color:var(--danger)}
 .tag.late{background:var(--coral-soft);color:var(--warn)}
@@ -990,7 +992,7 @@ function linha(x, opts = {}) {
   const late = opts.late ? `<span class="tag late">atrasado</span>` : '';
   const ref = x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`;
   return `<div class="row ${x.feito ? 'done' : ''}">${chk}<div class="bar" style="background:${x.cor}"></div><div class="time">${quando}</div>
-    <div class="txt" ${ref}><div class="t">${esc(x.titulo)}${x.k === 'item' ? tagsItem(x.it) : ''}${late}</div><div class="s">${subtitulo(x)}</div></div></div>`;
+    <div class="txt" ${ref}><div class="t">${tituloHtml(x)}${x.k === 'item' ? tagsItem(x.it) : ''}${late}</div><div class="s">${subtitulo(x)}</div></div></div>`;
 }
 
 /* ================= views ================= */
@@ -1152,8 +1154,8 @@ function vSemana() {
     const d = ymd(addDays(ini, i)), dd = addDays(ini, i), ctlD = ctlSem.filter(x => x.data === d), lst = ent.filter(x => x.data === d);
     const estreito = (dd.getDay() === 0 || dd.getDay() === 6) && !lst.length && !ctlD.length;
     html += `<div class="dia ${d === hs ? 'hoje' : ''}" ${estreito ? 'style="padding:10px 6px"' : ''}><h4 ${estreito ? 'style="flex-direction:column;align-items:center;gap:2px"' : ''}><span style="text-transform:capitalize">${estreito ? DIAS[dd.getDay()] : DIAS_L[dd.getDay()].replace('-feira', '')}</span><small>${dd.getDate()}/${pad(dd.getMonth() + 1)}</small></h4>
-      ${lst.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="${estiloSA(x.sa, x.cor)}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? `<b>${x.hora}</b> ` : ''}${esc(x.titulo)}${x.sa && x.sa !== 'busy' && SHOWAS[x.sa] ? ` <span class="tag">${SHOWAS[x.sa]}</span>` : ''}</div>`).join('')}
-      ${ctlD.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="border-color:${corCtl(x.p)};border-left-style:dashed" data-selproj="${x.p.id}" title="${esc(x.p.nome + ' · ' + x.titulo)}">📋 <b>${esc(x.p.nome)}</b>: ${esc(x.titulo)}</div>`).join('')}
+      ${lst.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="${estiloSA(x.sa, x.cor)}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? `<b>${x.hora}</b> ` : ''}${tituloHtml(x)}${x.sa && x.sa !== 'busy' && SHOWAS[x.sa] ? ` <span class="tag">${SHOWAS[x.sa]}</span>` : ''}</div>`).join('')}
+      ${ctlD.map(x => `<div class="ent ${x.feito ? 'done' : ''}" style="border-color:${tagProjeto(x.p).cor};border-left-style:dashed;background:#fff" data-selproj="${x.p.id}" title="${esc(x.p.nome + ' · ' + x.titulo)}">${tagHtml(x.p)}${esc(x.titulo)}</div>`).join('')}
       ${lst.length || ctlD.length || estreito ? '' : '<div class="empty" style="font-size:12px">Livre</div>'}
       <button class="btn sm" style="margin-top:4px;width:100%" data-novo-data="${d}" title="Adicionar">${estreito ? '+' : '+ adicionar'}</button></div>`;
   }
@@ -1183,7 +1185,7 @@ function vCalendario() {
     for (let i = 0; i < 42; i++) {
       const dd = addDays(ini, i), d = ymd(dd), l = ent.filter(x => x.data === d), nCtl = ctlMes.filter(x => x.data === d && !x.feito).length;
       g += `<div class="cel ${dd.getMonth() !== m0.getMonth() ? 'fora' : ''} ${d === hs ? 'hoje' : ''}" data-dia="${d}"><span class="n">${dd.getDate()}</span>${nCtl ? `<span class="tag" title="Pendências de controle" style="float:right">📋 ${nCtl}</span>` : ''}
-        ${l.slice(0, 4).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? x.hora + ' ' : ''}${esc(x.titulo)}</div>`).join('')}
+        ${l.slice(0, 4).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${x.hora ? x.hora + ' ' : ''}${tituloHtml(x)}</div>`).join('')}
         ${l.length > 4 ? `<div class="mais">+${l.length - 4} mais</div>` : ''}</div>`;
     }
     return head.replace('<span class="lbl" id="calLbl"></span>', `<span class="lbl" style="text-transform:capitalize">${MESES[m0.getMonth()]} ${m0.getFullYear()}</span>`) + g + '</div>';
@@ -1197,8 +1199,8 @@ function vCalendario() {
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i));
     const cd = ctlCal.filter(x => x.data === d), porP = {}; cd.forEach(x => { (porP[x.p.id] = porP[x.p.id] || []).push(x); });
-    const chipsCtl = Object.values(porP).map(l => { const pend = l.filter(x => !x.feito).length; return `<div class="adchip" style="background:#fff;color:${corCtl(l[0].p)};border:1px dashed ${corCtl(l[0].p)};${pend ? '' : 'opacity:.45'}" data-selproj="${l[0].p.id}" title="${esc(l.map(x => (x.feito ? '✓ ' : '• ') + x.titulo).join('\n'))}">📋 ${esc(l[0].p.nome)} (${pend || '✓'})</div>`; }).join('');
-    g += `<div class="ad">${chipsCtl}${ent.filter(x => x.data === d && !x.hora).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${esc(x.titulo)}</div>`).join('')}</div>`;
+    const chipsCtl = Object.values(porP).map(l => { const pend = l.filter(x => !x.feito).length; return `<div class="adchip" style="background:#fff;color:var(--ink);border:1px dashed ${tagProjeto(l[0].p).cor};${pend ? '' : 'opacity:.45'}" data-selproj="${l[0].p.id}" title="${esc(l.map(x => (x.feito ? '✓ ' : '• ') + x.titulo).join('\n'))}">${tagHtml(l[0].p)}${pend ? pend + ' pendência' + (pend > 1 ? 's' : '') : '✓'}</div>`; }).join('');
+    g += `<div class="ad">${chipsCtl}${ent.filter(x => x.data === d && !x.hora).map(x => `<div class="adchip" style="${estiloSA(x.sa, x.cor)}${x.feito ? 'opacity:.45' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${tituloHtml(x)}</div>`).join('')}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
@@ -1208,7 +1210,7 @@ function vCalendario() {
       const s = Math.max(hm2min(x.hora), H0 * 60), e = Math.max(Math.min(hm2min(x.fim || x.hora) || s + 30, H1 * 60), s + 20);
       const top = (s - H0 * 60) / 60 * PX, h = (e - s) / 60 * PX - 2;
       const movel = x.k === 'item' ? !x.it.leitura : (x.e._cal.podeEditar && !x.e.isAllDay);
-      return `<div class="ev ${x.feito ? 'done' : ''} ${movel ? 'movel' : ''}" title="${esc(x.titulo + (x.sa && SHOWAS[x.sa] ? ' · ' + SHOWAS[x.sa] : ''))}" style="top:${top}px;height:${h}px;left:calc(${x._c / x._n * 100}% + 1px);width:calc(${100 / x._n}% - 3px);${estiloSA(x.sa, x.cor)}" ${x.k === 'item' ? `data-item="${x.it.id}" data-orig="${x.orig}"` : `data-ev="${esc(x.e.id)}"`} data-ini="${hm2min(x.hora)}" data-dur="${hm2min(x.fim || x.hora) - hm2min(x.hora)}" data-dia="${x.data}"><b>${x.hora}</b> ${esc(x.titulo)}${movel ? '<div class="rs"></div>' : ''}</div>`;
+      return `<div class="ev ${x.feito ? 'done' : ''} ${movel ? 'movel' : ''}" title="${esc(x.titulo + (x.sa && SHOWAS[x.sa] ? ' · ' + SHOWAS[x.sa] : ''))}" style="top:${top}px;height:${h}px;left:calc(${x._c / x._n * 100}% + 1px);width:calc(${100 / x._n}% - 3px);${estiloSA(x.sa, x.cor)}" ${x.k === 'item' ? `data-item="${x.it.id}" data-orig="${x.orig}"` : `data-ev="${esc(x.e.id)}"`} data-ini="${hm2min(x.hora)}" data-dur="${hm2min(x.fim || x.hora) - hm2min(x.hora)}" data-dia="${x.data}"><b>${x.hora}</b> ${tituloHtml(x)}${movel ? '<div class="rs"></div>' : ''}</div>`;
     }).join('')}${d === hs ? `<div class="nowline" id="nowline"></div>` : ''}</div>`;
   }
   return head.replace('<span class="lbl" id="calLbl"></span>', `<span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fim.getDate()} ${MESES[fim.getMonth()].slice(0, 3)} ${fim.getFullYear()}</span>`) + g + '</div>';
@@ -1262,6 +1264,8 @@ function vProjetos() {
     det = `<div class="card"><div style="display:flex;align-items:center;gap:10px"><span class="sw" style="background:${a ? a.cor : '#999'};width:16px;height:16px"></span><div style="flex:1"><h2 style="margin:0;font-size:20px">${esc(p.nome)}</h2><div class="hint">${esc(a ? a.nome : '')} · ${p.tipo === 'obra' ? 'Obra' : 'Projeto'}${CATEGORIAS[p.categoria] ? ' · ' + CATEGORIAS[p.categoria].nome : ''}${p.local ? ' · ' + esc(p.local) : ''}</div></div><button class="btn sm pri" data-demanda-proj="${p.id}">+ Demanda</button> <button class="btn sm" data-editproj="${p.id}">Editar</button></div>
       ${p.descricao ? `<p style="margin:10px 0 0;white-space:pre-wrap">${esc(p.descricao)}</p>` : ''}</div>
       ${cardControle(p)}
+      ${(() => { const hs = ymd(hoje0()), l = eventos.filter(e => { const r = projetoDoTexto(e.subject); return r && r.p.id === p.id && e.end.dateTime.slice(0, 10) >= hs; }).sort((a, b) => a.start.dateTime.localeCompare(b.start.dateTime)).slice(0, 12);
+        return l.length ? `<div class="card"><div class="sec-h"><h3>Na agenda</h3><span class="hint">reconhecidos pelo nome · período carregado</span></div>${l.map(e => `<div class="row"><div class="bar" style="background:${tagProjeto(p).cor}"></div><div class="time">${fmtData(e.start.dateTime.slice(0, 10))}${e.isAllDay ? '' : ' ' + e.start.dateTime.slice(11, 16)}</div><div class="txt" data-ev="${esc(e.id)}"><div class="t">${esc(tituloLimpo(e.subject, p) || e.subject)}</div><div class="s">${esc(e._cal.nome)}</div></div></div>`).join('')}</div>` : ''; })()}
       ${secoesItens(D.itens.filter(i => i.projetoId === p.id), { areaId: p.areaId, projetoId: p.id })}`;
   }
   return `<div class="proj-wrap">${lista}<div>${det}</div></div>`;
@@ -1477,7 +1481,7 @@ function modalEvento(e) {
       : (edit ? `<p><button class="btn sm" data-acao="addReuniaoOnline">+ Adicionar link ${c.fonte === 'google' ? 'do Google Meet' : 'do Teams'}</button></p>` : '')}
     <p>${e.webLink ? `<a href="${esc(e.webLink)}" target="_blank">Abrir no ${c.fonte === 'google' ? 'Google Agenda' : 'Outlook'}</a>` : ''}</p>
     <div class="box"><label class="hint" style="font-weight:600">Vincular a um projeto</label>
-      <div style="display:flex;gap:8px;margin-top:6px"><select id="eProj" style="flex:1;border:1px solid #cfd4de;border-radius:8px;padding:6px">${D.areas.map(a => { const ps = D.projetos.filter(p => p.areaId === a.id); return ps.length ? `<optgroup label="${esc(a.nome)}">${ps.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select>
+      <div style="display:flex;gap:8px;margin-top:6px"><select id="eProj" style="flex:1;border:1px solid #cfd4de;border-radius:8px;padding:6px">${optsProjetos((projetoDoTexto(e.subject) || {}).p ? projetoDoTexto(e.subject).p.id : '')}</select>
       <button class="btn" data-acao="vincularEv" ${D.projetos.length ? '' : 'disabled'}>Vincular</button></div>
       <div class="hint" style="margin-top:4px">${e.seriesMasterId ? 'Vincula a série inteira. ' : ''}O evento continua na agenda; o projeto passa a acompanhá-lo.</div></div>
     <div class="acts">${edit ? `<button class="btn dan l" data-acao="excluirEv">Excluir</button>` : ''}<button class="btn" data-acao="fechar">Fechar</button>${edit ? `<button class="btn pri" data-acao="salvarEv">Salvar</button>` : ''}</div>`);
@@ -1528,6 +1532,9 @@ function modalProj(p) {
     <div class="box"><div class="fr"><div class="f"><label>Categoria de controle</label><select id="pCat"><option value="">— nenhuma —</option>${Object.entries(CATEGORIAS).map(([k, c]) => `<option value="${k}" ${p.categoria === k ? 'selected' : ''}>${c.nome}</option>`).join('')}</select></div>
       <div class="f"><label>Local (cidade)</label><input id="pLocal" value="${esc(p.local || '')}" placeholder="Ex.: Niterói"></div>
       <div class="f" style="max-width:110px"><label>Estado</label><select id="pUF">${UFS.map(u => `<option ${(p.uf || D.config.ufPadrao || 'RJ') === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div>
+      <div class="fr"><div class="f"><label>Etiqueta (nome curto)</label><input id="pTag" value="${esc(p.tag || '')}" placeholder="${esc(partesProjeto(p.nome ? p : { nome: '' }).obra || 'Ex.: Studios Claret')}"></div>
+        <div class="f" style="max-width:150px"><label>Cor da construtora</label><input type="color" id="pCorTag" value="${p.nome ? tagProjeto(p).cor : '#64748b'}" style="height:38px;padding:2px"></div></div>
+      <div class="f"><label>Outros nomes usados na agenda (separados por vírgula)</label><input id="pApelidos" value="${esc(p.apelidos || '')}" placeholder="Ex.: Claret, Est. Claret"></div>
       <div class="f"><label>Feriados municipais (dia/mês, separados por vírgula)</label><input id="pFerLoc" value="${esc(p.feriadosLocais || '')}" placeholder="Ex.: 20/01, 24/06"></div>
       <div class="fr"><div class="f"><label>Agenda das reuniões</label><select id="pAgenda"><option value="">Automática</option>${todosCals().filter(k => k.podeEditar).map(k => { const v = k.padrao ? '@principal' : k.id; return `<option value="${esc(v)}" ${p.agendaId === v ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}</option>`; }).join('')}</select></div>
         <div class="f" style="flex:2"><label>Participantes padrão das reuniões</label><input id="pPart" value="${esc(p.participantes || '')}" placeholder="e-mails separados por vírgula"></div></div>
@@ -1642,6 +1649,8 @@ document.addEventListener('click', async ev => {
     case 'salvarProj': {
       const p = modalProj._p; p.nome = $('#pNome').value.trim(); p.areaId = $('#pArea').value; p.tipo = $('#pTipo').value; p.descricao = $('#pDesc').value;
       const catNova = $('#pCat').value; if (catNova && catNova !== p.categoria) p.controleDesde = ymd(segundaDe(hoje0()));
+      { const pt = partesProjeto(p), cor = $('#pCorTag').value; if (pt.construtora) { D.config.coresConstrutora = D.config.coresConstrutora || {}; if (cor !== (corConstrutora(pt.construtora) || '')) D.config.coresConstrutora[normTxt(pt.construtora).trim()] = cor; delete p.corTag; } else p.corTag = cor; }
+      Object.assign(p, { tag: $('#pTag').value.trim(), apelidos: $('#pApelidos').value.trim() }); cacheEvProj.clear();
       Object.assign(p, { categoria: catNova, local: $('#pLocal').value.trim(), uf: $('#pUF').value, feriadosLocais: $('#pFerLoc').value.trim(), agendaId: $('#pAgenda').value, participantes: $('#pPart').value.trim() });
       if (!p.nome) return toast('Dê um nome ao projeto.', true);
       if (modalProj._novo) D.projetos.push(p);
@@ -1965,6 +1974,86 @@ function migrarProjetos() {
     });
   });
   D.config.migracao = 1; salvar();
+}
+function migrarCores() {
+  if ((D.config.migracao || 0) >= 2) return;
+  const norm = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cor = { rnunes: '#7c3aed', jf: '#ea580c', sigo: '#2563eb' };
+  D.areas.forEach(a => { if (cor[norm(a.nome)]) a.cor = cor[norm(a.nome)]; });
+  const magi = D.projetos.find(p => norm(p.nome) === 'consultoriamagi'); if (magi && !magi.apelidos) magi.apelidos = 'Magi';
+  D.config.migracao = 2; salvar();
+}
+
+/* ================= etiquetas de obra e vínculo automático pelo nome ================= */
+const CORES_CONSTRUTORA = { 'ferreira': '#dc2626', 'hugo fabbri': '#16a34a', 'dgo': '#2563eb', 'geromel': '#eab308', 's figueiredo': '#2563eb', 'volume': '#16a34a', 'rh': '#f97316', 'ew': '#eab308', 'dsm': '#2563eb', 'russi russi': '#9333ea', 'tap': '#9333ea' };
+const semAcento = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const normTxt = x => ' ' + semAcento(x).toLowerCase().replace(/&/g, ' ').replace(/[^a-z0-9]+/g, ' ').replace(/\b(e?studios?|e?studio)\b/g, 'studios').trim() + ' ';
+function partesProjeto(p) {
+  const i = p.nome.indexOf(' - ');
+  return i > 0 ? { construtora: p.nome.slice(0, i).trim(), obra: p.nome.slice(i + 3).trim() } : { construtora: '', obra: p.nome };
+}
+function corConstrutora(c) {
+  const k = normTxt(c).trim();
+  return ((D.config.coresConstrutora || {})[k]) || CORES_CONSTRUTORA[k] || '';
+}
+function tagProjeto(p) {
+  const pt = partesProjeto(p), a = area(p.areaId);
+  return { nome: p.tag || pt.obra, cor: p.corTag || corConstrutora(pt.construtora) || (a && a.cor) || '#64748b', construtora: pt.construtora };
+}
+function corTexto(hex) { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return '#fff'; const n = parseInt(m[1], 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)); return l > 170 ? '#3b2f00' : '#fff'; }
+function tagHtml(p) { const t = tagProjeto(p); return `<span class="otag" style="background:${t.cor};color:${corTexto(t.cor)}" title="${esc(p.nome)}">${esc(t.nome)}</span>`; }
+// palavras que identificam cada projeto (nome da obra + apelidos)
+let chavesCache = null, chavesAssin = '';
+function chavesProjetos() {
+  const assin = D.projetos.map(p => p.id + p.nome + (p.apelidos || '') + (p.tag || '')).join('|');
+  if (chavesCache && assin === chavesAssin) return chavesCache;
+  const l = [];
+  D.projetos.filter(p => p.categoria !== 'pessoal').forEach(p => {
+    const pt = partesProjeto(p), ks = new Set([normTxt(pt.obra), normTxt(p.nome)]);
+    if (p.tag) ks.add(normTxt(p.tag));
+    String(p.apelidos || '').split(',').map(x => x.trim()).filter(Boolean).forEach(x => ks.add(normTxt(x)));
+    if (pt.construtora && D.projetos.filter(q => partesProjeto(q).construtora === pt.construtora).length === 1) ks.add(normTxt(pt.construtora));
+    ks.forEach(k => { if (k.trim().length >= 2) l.push({ k, p }); });
+  });
+  l.sort((a, b) => b.k.length - a.k.length);
+  chavesCache = l; chavesAssin = assin; return l;
+}
+const cacheEvProj = new Map();
+function projetoDoTexto(txt) {
+  if (!txt) return null;
+  if (cacheEvProj.has(txt) && chavesAssin) return cacheEvProj.get(txt);
+  const n = normTxt(txt), hit = chavesProjetos().find(c => n.includes(c.k));
+  const r = hit ? { p: hit.p, k: hit.k } : null;
+  cacheEvProj.set(txt, r); return r;
+}
+// título sem o nome da obra/construtora, com só a primeira letra maiúscula
+function tituloLimpo(txt, p) {
+  const pt = partesProjeto(p);
+  const orig = ' ' + txt + ' ';
+  // remove pelo texto sem acento, preservando os acentos do original
+  const tirar = [p.nome, pt.obra, pt.construtora, p.tag].concat(String(p.apelidos || '').split(',')).map(x => String(x || '').trim()).filter(x => x.length >= 2);
+  let out = orig;
+  tirar.sort((a, b) => b.length - a.length).forEach(x => {
+    const rx = new RegExp(semAcento(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/e?studios?/gi, 'e?studios?').replace(/\s+/g, '[\\s\\-–—&]+'), 'gi');
+    let m; const base = semAcento(out);
+    const cortes = []; while ((m = rx.exec(base))) { cortes.push([m.index, m.index + m[0].length]); if (!m[0].length) break; }
+    for (let i = cortes.length - 1; i >= 0; i--) out = out.slice(0, cortes[i][0]) + ' ' + out.slice(cortes[i][1]);
+  });
+  out = out.replace(/[\s\-–—:|/·,]+$/g, '').replace(/^[\s\-–—:|/·,]+/g, '').replace(/\s{2,}/g, ' ').trim();
+  if (!out) return '';
+  const low = out.toLocaleLowerCase('pt-BR');
+  return low.charAt(0).toLocaleUpperCase('pt-BR') + low.slice(1);
+}
+function projetoDaEntrada(x) {
+  if (x.k === 'item') { const p = projeto(x.it.projetoId); return p && p.categoria !== 'pessoal' ? p : null; }
+  if (x.k === 'ev') { const r = projetoDoTexto(x.e.subject); return r ? r.p : null; }
+  return null;
+}
+function tituloHtml(x) {
+  const p = projetoDaEntrada(x);
+  if (!p) return esc(x.titulo);
+  const t = x.k === 'ev' || (x.it && x.it.vinculado) ? tituloLimpo(x.titulo, p) : x.titulo.replace(' — ' + p.nome, '');
+  return tagHtml(p) + esc(t);
 }
 
 /* ================= demandas rápidas ================= */
@@ -2375,6 +2464,7 @@ function telaLogin(msg) {
   document.body.classList.remove('login');
   garantirPessoal();
   migrarProjetos();
+  migrarCores();
   gRestaurar();
   render();
   if (gOk()) gCarregarCalendarios().then(() => { faixaEventos = ''; render(); }).catch(e => { erroGoogle = e.message; });
