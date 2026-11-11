@@ -168,8 +168,8 @@ body.mini #outlookStatus .dot{margin:3px}
 .wk .hrs{position:relative}
 .wk .hr:first-child{visibility:hidden}
 .wk .hd{position:relative}
-.hdots{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;gap:6px;align-items:center;max-width:45%;flex-wrap:wrap;justify-content:flex-end}
-.hdots .pd{width:9px;height:9px;border-radius:50%;cursor:pointer;display:block}
+.hdots{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;gap:11px;row-gap:9px;align-items:center;max-width:45%;flex-wrap:wrap;justify-content:flex-end}
+.hdots .pd{width:10px;height:10px;flex:none;border-radius:50%;cursor:pointer;display:block}
 .hdots .pd.ok{opacity:.35}
 .hdots b{font-size:10px;color:var(--muted)}
 .wk .hr{height:var(--px,48px);font-size:11px;color:var(--muted);text-align:right;padding-right:6px;transform:translateY(-7px);font-variant-numeric:tabular-nums}
@@ -376,7 +376,9 @@ const projeto = id => D.projetos.find(p => p.id === id);
 function calObj(id) { const l = todosCals(); if (id === '@principal') id = ''; return id ? l.find(c => c.id === id) : l.find(c => c.padrao); }
 function corDoCal(id) { const l = todosCals(), c = calObj(id); return c ? corCal(c, l.indexOf(c)) : ''; }
 const corItem = it => (it.demanda && projeto(it.projetoId) ? corDemanda(projeto(it.projetoId)) : '') || corDoCal(calendarioDoItem(it)) || (area(it.areaId) || {}).cor || '#64748b';
-function corDemanda(p) { return p.categoria === 'pessoal' ? '#16a34a' : tagProjeto(p).cor; }
+// cor da empresa (borda/anel): R. Nunes roxo, JF laranja, SIGO azul, Pessoal verde
+function corEmpresa(p) { const a = area(p.areaId); return p.categoria === 'pessoal' ? '#16a34a' : (a && a.cor) || '#64748b'; }
+function corDemanda(p) { return corEmpresa(p); }
 function areaDoItem(it) {
   const p = projeto(it.projetoId); if (p) return p.areaId;
   const cal = calendarioDoItem(it), a = D.areas.find(a => a.calendarioId && a.calendarioId === cal);
