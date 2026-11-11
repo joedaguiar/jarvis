@@ -1565,7 +1565,7 @@ function modalItem(it, novo) {
   const optsCal = (todosCals().some(k => k.padrao) ? '' : `<option value="@principal" ${!calAtual ? 'selected' : ''}>Outlook · Calendário principal</option>`) +
     editaveis.map(k => `<option value="${k.padrao ? '@principal' : esc(k.id)}" ${(k.padrao ? !calAtual : calAtual === k.id) ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}${k.podeEditar ? '' : ' (só leitura)'}</option>`).join('');
   const dsel = r.dias || [];
-  abrirModal(`<h3>${novo ? 'Novo item' : 'Editar item'}</h3>
+  abrirModal(`<h3>${novo ? 'Novo agendamento' : 'Editar agendamento'}</h3>
   <div class="fr"><div class="f" style="flex:2"><label>Título</label><input id="iTit" value="${esc(it.titulo)}" placeholder="Ex.: Relatório semanal de avanço"></div>
     <div class="f"><label>Tipo</label><select id="iTipo">${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}" ${k === it.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
   <div class="fr"><div class="f"><label>Agenda</label><div style="display:flex;gap:6px;align-items:center"><span class="sw" id="iCalSw" style="width:14px;height:14px;background:${corItem(it)}"></span><select id="iCal" style="flex:1">${optsCal}</select></div></div><div class="f"><label>Projeto / obra</label><select id="iProj">${optsProj}</select></div></div>
@@ -1599,7 +1599,7 @@ function modalItem(it, novo) {
   const upd = () => {
     const rep = $('#iRep').value, tipo = $('#iTipo').value;
     $$('.rep').forEach(e => e.style.display = rep === 'nao' ? 'none' : '');
-    $$('.rep-sem').forEach(e => e.style.display = rep === 'semanal' || rep === 'nao' ? '' : 'none');
+    $$('.rep-sem').forEach(e => e.style.display = rep === 'semanal' ? '' : 'none');
     $$('.rep-mes').forEach(e => e.style.display = rep === 'mensal' ? '' : 'none');
     const pos = $('#iModo').value === 'posicao';
     $$('.mm-dia').forEach(e => e.style.display = pos ? 'none' : ''); $$('.mm-pos').forEach(e => e.style.display = pos ? '' : 'none');
@@ -2465,7 +2465,7 @@ function ligarRec(dataPadrao) {
   const updRec = () => {
     const rep = $('#iRep').value;
     $$('.rep').forEach(e => e.style.display = rep === 'nao' ? 'none' : '');
-    $$('.rep-sem').forEach(e => e.style.display = rep === 'semanal' || rep === 'nao' ? '' : 'none');
+    $$('.rep-sem').forEach(e => e.style.display = rep === 'semanal' ? '' : 'none');
     $$('.rep-mes').forEach(e => e.style.display = rep === 'mensal' ? '' : 'none');
     const pos = $('#iModo').value === 'posicao';
     $$('.mm-dia').forEach(e => e.style.display = pos ? 'none' : ''); $$('.mm-pos').forEach(e => e.style.display = pos ? '' : 'none');
