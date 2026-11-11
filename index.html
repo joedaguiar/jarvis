@@ -1204,7 +1204,7 @@ function vTarefas() {
   const q = tFiltro.q.trim().toLowerCase();
   cards.sort((a, b) => (a.data || '9').localeCompare(b.data || '9') || ((a.k === 'item' && a.it.hora) || '').localeCompare((b.k === 'item' && b.it.hora) || ''));
   const ehExec = c => c.k === 'ctl' || (c.it.projetoId && projeto(c.it.projetoId) && (projeto(c.it.projetoId).categoria !== 'pessoal' || !c.it.recorrencia));
-  const vis = cards.filter(c => (tFiltro.rotinas || ehExec(c)) && (!tFiltro.proj || pid(c) === tFiltro.proj) && (!tFiltro.cat || cat(c) === tFiltro.cat) && (!q || c.titulo.toLowerCase().includes(q)));
+  const vis = cards.filter(c => (c.k === 'ctl' || c.it.demanda) && (!tFiltro.proj || pid(c) === tFiltro.proj) && (!tFiltro.cat || cat(c) === tFiltro.cat) && (!q || c.titulo.toLowerCase().includes(q)));
   const card = c => {
     const p = projeto(pid(c)), cor = c.k === 'ctl' ? corCtl(c.p) : corItem(c.it);
     const chk = c.k === 'ctl' ? `data-ctl="${c.p.id}|${c.pkey}|${c.tkey}"` : `data-conc="${c.it.id}|${c.chave}"`;
@@ -1227,8 +1227,7 @@ function vTarefas() {
       <span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fimS.getDate()} ${MESES[fimS.getMonth()].slice(0, 3)} ${fimS.getFullYear()}</span><span style="flex:1"></span>
       <div class="tfiltros"><input id="tfQ" placeholder="Buscar…" value="${esc(tFiltro.q)}">
       <select id="tfProj"><option value="">Todos os projetos</option>${optsProjetos(tFiltro.proj)}</select>
-      <select id="tfCat"><option value="">Todas as categorias</option>${Object.entries(CATEGORIAS).map(([k, c]) => `<option value="${k}" ${tFiltro.cat === k ? 'selected' : ''}>${c.nome}</option>`).join('')}</select>
-      <label class="cb" style="margin:0" title="Mostrar também rotinas pessoais e itens sem projeto"><input type="checkbox" id="tfRot" ${tFiltro.rotinas ? 'checked' : ''}> Rotinas</label></div></div>
+      <select id="tfCat"><option value="">Todas as categorias</option>${Object.entries(CATEGORIAS).map(([k, c]) => `<option value="${k}" ${tFiltro.cat === k ? 'selected' : ''}>${c.nome}</option>`).join('')}</select></div></div>
     <div class="quadro tsem" style="grid-template-columns:${cols}">${html}</div>`;
 }
 
