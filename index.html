@@ -59,6 +59,7 @@ body.mini #outlookStatus .dot{margin:3px}
 .chip .sw{width:9px;height:9px}
 .btn{border:1px solid var(--areia);background:var(--papel);border-radius:12px;padding:7px 14px;font-weight:600;box-shadow:0 1px 0 #fff inset}
 .btn:hover{background:#fff}
+.btn.ok{background:#fff;border-color:#16a34a;color:#15803d}.btn.ok:hover{background:#16a34a;color:#fff}
 .btn.pri{background:var(--coral);border-color:var(--coral);color:#fff;box-shadow:0 6px 14px rgba(232,105,63,.28)}
 .btn.pri:hover{background:#d95a31}
 .btn.dan{color:var(--danger)}
@@ -1948,7 +1949,6 @@ function tarefasControle(p, ini, fim) {
       const pkey = 'S:' + ymd(seg), r = ctlPeek(p.id, pkey), reu = dataReuniao(p.id, pkey);
       const dReu = reu ? parseYmd(reu.data) : ultimoUtilSemana(seg, c), d1 = primeiroUtilSemana(seg, c);
       add(pkey, 'agendar', 'Agendar a reunião semanal', d1, { acao: 'agendar', feito: !!reu || !!r.feitos.agendar, reuniao: reu, sugestao: ymd(ultimoUtilSemana(seg, c)), periodo: 'semana de ' + fmtData(ymd(seg)) });
-      add(pkey, 'atualizar', `Pedir atualização do sistema R. Nunes (até ${fmtData(ymd(anteriorUtil(dReu, c)))})`, d1);
       add(pkey, 'relatorios', 'Fechar os relatórios semanais', dReu);
       if (ultimaSemanaDoMes(seg)) TAREFAS_SIENGE.forEach((t, i) => add(pkey, 'm' + i, t, dReu, { mensal: nomeMes(mesDaSemana(seg)) }));
     }
@@ -2209,11 +2209,11 @@ function modalDemanda(it, pid, pre) {
 
       <div class="hint" style="margin-top:4px">Cria um evento curto "⏰ Lembrete" na agenda da empresa, no dia e horário do lembrete, que notifica pelo app do Outlook ou do Google. O prazo em si não vai para a agenda.</div></div>
     <div class="acts">${novo ? `<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarDemanda">Salvar</button>`
-      : `<button class="btn dan l" data-acao="excluirDemanda">Excluir</button>${feito ? '<button class="btn" data-acao="reabrirDemanda">Reabrir</button>' : '<button class="btn pri" data-acao="concluirDemanda">✓ Concluir</button>'}`}</div>`);
+      : `<button class="btn dan l" data-acao="excluirDemanda">Excluir</button><span class="hint" id="dSalvo" style="margin-right:auto;align-self:center">As alterações são salvas sozinhas.</span>${feito ? '<button class="btn" data-acao="reabrirDemanda">Reabrir</button>' : '<button class="btn ok" data-acao="concluirDemanda" title="Marca a demanda como feita">✓ Marcar como concluída</button>'}`}</div>`);
   modalDemanda._it = it; modalDemanda._pre = pre;
   if (!novo) {
     // edição: salva sozinho a cada alteração
-    let t; const auto = () => { clearTimeout(t); t = setTimeout(() => salvarDemanda({ manter: true, silencioso: true }), 400); };
+    let t; const auto = () => { clearTimeout(t); t = setTimeout(async () => { await salvarDemanda({ manter: true, silencioso: true }); const el = $('#dSalvo'); if (el) el.textContent = '✓ Salvo'; }, 400); };
     ['#dProj', '#dTit', '#dPrazo', '#dLembD', '#dLembH', '#dAviso'].forEach(sel => $(sel).addEventListener('change', auto));
   }
   $('#dProj').addEventListener('change', () => { const q = projeto($('#dProj').value); $('#dCor').style.background = q ? corDemanda(q) : '#c9c2b5'; });
