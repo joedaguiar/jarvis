@@ -457,6 +457,8 @@ function corAgendaRN() {
   if (dom && dom !== D.config.corRN) { D.config.corRN = dom; salvar(); }
   return (_corRN = dom || D.config.corRN || '#6b2fa3');
 }
+// reunião criada pelo sistema: mesmo tom mais claro das reuniões do Outlook
+function corItemAgenda(it) { const c = corItem(it); return it.tipo === 'reuniao' && !it.demanda ? clarear(c, estiloEv() === 'solido' ? 0.4 : 0.28) : c; }
 function corEmpresa(p) {
   const a = area(p.areaId);
   if (p.categoria === 'pessoal') return '#16a34a';
@@ -775,13 +777,13 @@ function clarear(hex, f) {
   return '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
 }
 const ehReuniao = e => !!(e.isOnlineMeeting || (e.attendees && e.attendees.length) || e.onlineMeeting);
-function corEvento(e, base) {
+function corEvento(e, base, dono) {
   let cor = base;
   // categorias com o nome das empresas foram colocadas pelo próprio sistema antes: ignora
   const nomesArea = new Set(D.areas.map(a => a.nome));
   if (e.categories && e.categories.length && categorias) { const c = e.categories.filter(n => !nomesArea.has(n)).map(n => categorias[n]).find(Boolean); if (c) cor = c; }
   else if (e.gColor && GCORES[e.gColor]) cor = GCORES[e.gColor];
-  if (e._cal.padrao && ehReuniao(e)) return clarear(cor, estiloEv() === 'solido' ? 0.4 : 0.28);
+  if ((dono && dono.tipo === 'reuniao') || (e._cal.padrao && ehReuniao(e))) return clarear(cor, estiloEv() === 'solido' ? 0.4 : 0.28);
   return cor;
 }
 const SHOWAS = { free: 'Livre', tentative: 'Provisório', busy: 'Ocupado', oof: 'Ausência temporária', workingElsewhere: 'Trabalhando em outro lugar' };
@@ -1081,7 +1083,7 @@ function entradas(ini, fim) {
       const data = (x && x.data) || d, hora = x && x.hora !== undefined ? x.hora : it.hora, dur = (x && x.duracao) || it.duracao;
       const dd = parseYmd(data); if (dd < ini || dd > fim) return;
       const st = hora ? hm2min(hora) : null;
-      out.push({ k: 'item', it, sa: it.showAs, orig: d, data, hora, dur, fim: st != null ? min2hm(Math.min(st + (+dur || 30), 1439)) : '', titulo: it.titulo, cor: corItem(it), feito: !!it.concluidas[d] });
+      out.push({ k: 'item', it, sa: it.showAs, orig: d, data, hora, dur, fim: st != null ? min2hm(Math.min(st + (+dur || 30), 1439)) : '', titulo: it.titulo, cor: corItemAgenda(it), feito: !!it.concluidas[d] });
     });
   });
   const meus = idsDoSistema();
@@ -1098,7 +1100,7 @@ function entradas(ini, fim) {
       if (dono.excecoes && dono.excecoes[sd] && dono.excecoes[sd].cancelada) return;
       if (e.onlineMeeting && e.onlineMeeting.joinUrl && dono.linkReuniao !== e.onlineMeeting.joinUrl) dono.linkReuniao = e.onlineMeeting.joinUrl;
       if (e.showAs && !dono._pend && dono.showAs !== e.showAs && !e.seriesMasterId) { dono.showAs = e.showAs; if (dono.vinculado) dono.showAsImport = e.showAs; }
-      base = { k: 'item', it: dono, orig: sd, titulo: dono.vinculado ? (e.subject || dono.titulo) : dono.titulo, cor: corEvento(e, corBase), sa: e.showAs, feito: !!dono.concluidas[sd], ev: e };
+      base = { k: 'item', it: dono, orig: sd, titulo: dono.vinculado ? (e.subject || dono.titulo) : dono.titulo, cor: corEvento(e, corBase, dono), sa: e.showAs, feito: !!dono.concluidas[sd], ev: e };
     } else base = { k: 'ev', e, titulo: e.subject || '(sem título)', cor: corEvento(e, corBase), sa: e.showAs, feito: false };
     if (e.isAllDay) {
       for (let d = parseYmd(sd); d < parseYmd(e.end.dateTime.slice(0, 10)); d = addDays(d, 1))
