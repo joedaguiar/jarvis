@@ -439,11 +439,22 @@ function corDoCal(id) { const l = todosCals(), c = calObj(id); return c ? corCal
 const corItem = it => (it.demanda && projeto(it.projetoId) ? corDemanda(projeto(it.projetoId)) : '') || corDoCal(calendarioDoItem(it)) || (area(it.areaId) || {}).cor || '#64748b';
 // cor da empresa (borda/anel): R. Nunes roxo, JF laranja, SIGO azul, Pessoal verde
 let _corRN;
+function matiz(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim()); if (!m) return -1;
+  const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (!d) return -1;
+  const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+const ehRoxo = c => { const h = matiz(c); return h >= 245 && h <= 320; };
+// roxo da R. Nunes = o roxo que aparece nos eventos das agendas do Rodrigo Nunes
 function corAgendaRN() {
   if (_corRN !== undefined) return _corRN;
-  const l = todosCals(), vis = new Set(D.config.calendariosVisiveis || []);
-  const c = l.find(c => /rodrigo nunes/i.test(c.nome) && vis.has(c.id)) || l.find(c => /rodrigo nunes/i.test(c.nome)) || l.find(c => (D.config.gruposCal || {})[c.id] && /nunes/i.test(D.config.gruposCal[c.id]));
-  return (_corRN = c ? corCal(c, l.indexOf(c)) : '');
+  const k = chaveRN(), cont = {}, l = todosCals();
+  eventos.forEach(e => { if (!e._cal || chaveFiltro(e._cal.id) !== k) return; const c = corEvento(e, corCal(e._cal, l.indexOf(e._cal))); if (ehRoxo(c)) cont[c] = (cont[c] || 0) + 1; });
+  const dom = Object.keys(cont).sort((a, b) => cont[b] - cont[a])[0];
+  if (dom && dom !== D.config.corRN) { D.config.corRN = dom; salvar(); }
+  return (_corRN = dom || D.config.corRN || '#6b2fa3');
 }
 function corEmpresa(p) {
   const a = area(p.areaId);
@@ -1207,11 +1218,10 @@ function widgetClima() {
   if (!clima) return `<section class="card clima"><h3>Clima · ${CLIMA_LOCAL.nome}</h3><div class="empty">Buscando a previsão…</div></section>`;
   const j = clima.j, cur = j.current || {}, d = j.daily || {}, [ic, desc] = tempo(cur.weather_code);
   const dias = (d.time || []).map((t, i) => ({ t, ic: tempo(d.weather_code[i])[0], max: Math.round(d.temperature_2m_max[i]), min: Math.round(d.temperature_2m_min[i]), pp: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null, mm: d.precipitation_sum ? d.precipitation_sum[i] : 0 }));
-  const chuva = dias.filter(x => x.pp >= 60 && x.mm >= 2 && parseYmd(x.t).getDay() % 6 !== 0);
   return `<section class="card clima"><div class="sec-h"><h3>Clima · ${CLIMA_LOCAL.nome}</h3><span class="hint">Open-Meteo</span></div>
     <div class="cl-agora"><span class="cl-ic">${ic}</span><b>${Math.round(cur.temperature_2m)}°</b><div><div>${desc}</div><div class="hint">Umidade ${cur.relative_humidity_2m ?? '–'}% · vento ${Math.round(cur.wind_speed_10m || 0)} km/h</div></div></div>
     <div class="cl-dias">${dias.map(x => { const dd = parseYmd(x.t); return `<div class="cl-d ${x.t === ymd(hoje0()) ? 'hoje' : ''}" title="${x.mm ? x.mm.toFixed(1) + ' mm' : 'sem chuva'}"><span>${x.t === ymd(hoje0()) ? 'hoje' : DIAS[dd.getDay()]}</span><i>${x.ic}</i><b>${x.max}°</b><small>${x.min}°</small>${x.pp != null ? `<em class="${x.pp >= 60 ? 'alta' : ''}">💧${x.pp}%</em>` : ''}</div>`; }).join('')}</div>
-    ${chuva.length ? `<div class="cl-alerta">Chuva forte prevista em dia útil: <b>${chuva.map(x => DIAS[parseYmd(x.t).getDay()] + ' ' + parseYmd(x.t).getDate()).join(', ')}</b>. Vale avisar as obras.</div>` : ''}</section>`;
+    </section>`;
 }
 function demandasAbertas(ini, fim) {
   const out = [];
