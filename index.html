@@ -108,6 +108,35 @@ body.mini #outlookStatus .dot{margin:3px}
 .kpi.anel b{font-size:14px;color:var(--ink)}
 .atalhos{display:flex;gap:8px}
 .col-a,.col-b{min-width:0}
+.kpi{border:0;font:inherit;text-align:left;cursor:pointer}.kpi.anel{cursor:default}
+.kpi:hover{box-shadow:0 1px 0 #fff inset,0 8px 18px rgba(31,59,82,.1)}
+.ag{display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:12px;border-bottom:1px solid var(--line-2)}
+.ag:last-child{border-bottom:0}
+.ag.passou{opacity:.45}
+.ag.atual{background:var(--coral-soft)}
+.ag-h{width:46px;flex:none;font-weight:700;font-variant-numeric:tabular-nums;font-size:13px;display:flex;flex-direction:column;line-height:1.15}
+.ag-h small{font-weight:500;color:var(--muted);font-size:11px}
+.ag>i{width:4px;align-self:stretch;border-radius:3px;flex:none}
+.ag-t{flex:1;min-width:0;cursor:pointer;font-weight:600;font-size:13.5px}
+.tag.agora{background:var(--coral);color:#fff}.tag.prox{background:#e6efed;color:var(--salvia-esc)}
+.ag-dia{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.ag-dia .adchip{position:static;cursor:pointer}
+.dg{margin-bottom:10px}.dg h4{display:flex;align-items:center;gap:8px;margin:6px 4px 4px;font-size:12.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.dg h4 span{background:var(--papel);border:1px solid var(--line);border-radius:999px;padding:0 8px;font-size:11px;color:var(--muted)}
+.dg.alerta h4{color:var(--warn)}.dg.alerta h4 span{background:var(--coral);border-color:var(--coral);color:#fff}
+.dg.hoje h4{color:var(--coral)}
+.btn.ghost{background:none;border:0;color:var(--salvia-esc);margin:2px 0 0 6px}
+.clima .cl-agora{display:flex;align-items:center;gap:12px;margin:2px 0 12px}
+.clima .cl-ic{font-size:34px;line-height:1}.clima .cl-agora>b{font-size:30px;font-weight:800;letter-spacing:-1px}
+.cl-dias{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cl-d{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;border-radius:12px;background:#fff;font-size:12px}
+.cl-d.hoje{background:var(--coral-soft)}
+.cl-d span{color:var(--muted);font-size:11px}.cl-d i{font-style:normal;font-size:18px;line-height:1.3}.cl-d b{font-weight:800}.cl-d small{color:var(--muted)}
+.cl-d em{font-style:normal;font-size:10.5px;color:var(--muted)}.cl-d em.alta{color:#2563eb;font-weight:700}
+.cl-alerta{margin-top:10px;font-size:12.5px;background:#eef4ff;color:#1e3a8a;border-radius:10px;padding:7px 10px}
+.emp{display:flex;align-items:center;gap:10px;padding:5px 0}
+.emp-n{width:80px;flex:none;font-weight:600;display:flex;align-items:center;gap:7px}.emp-n i{width:10px;height:10px;border-radius:50%}
+.emp-b{flex:1;height:8px;border-radius:99px;background:var(--areia);overflow:hidden}.emp-b b{display:block;height:100%;border-radius:99px}
+.emp-c{width:120px;flex:none;text-align:right;font-size:12.5px;font-variant-numeric:tabular-nums}.emp-c em{font-style:normal;color:var(--warn);font-weight:600}
 .minical{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
 .minical .mh{font-size:11px;color:var(--muted);font-weight:700;padding-bottom:2px}
 .minical .md{border:0;background:none;border-radius:10px;padding:5px 0 3px;font-weight:600;font-size:12.5px;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -303,6 +332,11 @@ body.login #nav,body.login #nav2{display:none}
   .tfiltros #tfQ{min-width:0;flex:1}
   #modalBg{padding:10px}
   #modal .fr>.f{min-width:100%}
+  .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+  .kpi{min-width:0;padding:8px 10px}.kpi.anel{grid-column:1/-1}
+  .dg .row .time{width:58px;font-size:11.5px}
+  .dg .row{flex-wrap:wrap}.dg .row .btn{margin-left:auto}
+  .emp-c{width:auto}
 }
 </style>
 </head>
@@ -404,7 +438,19 @@ function calObj(id) { const l = todosCals(); if (id === '@principal') id = ''; r
 function corDoCal(id) { const l = todosCals(), c = calObj(id); return c ? corCal(c, l.indexOf(c)) : ''; }
 const corItem = it => (it.demanda && projeto(it.projetoId) ? corDemanda(projeto(it.projetoId)) : '') || corDoCal(calendarioDoItem(it)) || (area(it.areaId) || {}).cor || '#64748b';
 // cor da empresa (borda/anel): R. Nunes roxo, JF laranja, SIGO azul, Pessoal verde
-function corEmpresa(p) { const a = area(p.areaId); return p.categoria === 'pessoal' ? '#16a34a' : (a && a.cor) || '#64748b'; }
+let _corRN;
+function corAgendaRN() {
+  if (_corRN !== undefined) return _corRN;
+  const l = todosCals(), vis = new Set(D.config.calendariosVisiveis || []);
+  const c = l.find(c => /rodrigo nunes/i.test(c.nome) && vis.has(c.id)) || l.find(c => /rodrigo nunes/i.test(c.nome)) || l.find(c => (D.config.gruposCal || {})[c.id] && /nunes/i.test(D.config.gruposCal[c.id]));
+  return (_corRN = c ? corCal(c, l.indexOf(c)) : '');
+}
+function corEmpresa(p) {
+  const a = area(p.areaId);
+  if (p.categoria === 'pessoal') return '#16a34a';
+  if (chaveEmpresa(p.areaId) === 'rnunes') { const c = corAgendaRN(); if (c) return c; }
+  return (a && a.cor) || '#64748b';
+}
 function corDemanda(p) { return corEmpresa(p); }
 function chaveEmpresa(areaId) {
   const n = normTxt((area(areaId) || {}).nome || '').trim();
@@ -1084,6 +1130,7 @@ const TITULOS = { painel: 'Painel', tarefas: 'Tarefas', hoje: 'Painel', semana: 
 function irPara(v) { vista = v; render(); }
 function render() {
   if (drag && drag.ativo) return;
+  _corRN = undefined;
   if (vista === 'semana') vista = 'tarefas';
   $$('#nav button, #nav2 button').forEach(b => b.classList.toggle('on', b.dataset.v === vista || (b.dataset.v === 'config' && vista === 'projetos')));
   $('#titulo').textContent = TITULOS[vista];
@@ -1093,6 +1140,7 @@ function render() {
   const sc = $('#view').scrollTop;
   $('#view').innerHTML = f();
   if (vista === 'calendario' && modoCal === 'semana') posicionarCalendario();
+  if (vista === 'tarefas') { const q = $('#view .tsem'), hj = q && q.querySelector('.qcol.hoje'); if (q && hj && q.scrollWidth > q.clientWidth + 4 && !q.dataset.rolou) { q.scrollLeft = Math.max(0, hj.offsetLeft - q.offsetLeft - 8); } }
   marcarCarregando();
   $('#view').scrollTop = sc;
 }
@@ -1137,58 +1185,105 @@ function anel(feito, total, cor) {
   return `<svg width="58" height="58" viewBox="0 0 58 58" aria-hidden="true"><circle cx="29" cy="29" r="${r}" fill="none" stroke="var(--areia)" stroke-width="7"/><circle cx="29" cy="29" r="${r}" fill="none" stroke="${cor}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 29 29)"/></svg>`;
 }
 function saudacao() { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
+/* clima: São Pedro da Aldeia (Open-Meteo, sem chave) */
+const CLIMA_LOCAL = { nome: 'São Pedro da Aldeia', lat: -22.8392, lon: -42.1028 };
+let clima = (() => { try { return JSON.parse(localStorage.getItem('clima')) || null; } catch { return null; } })(), climaBuscando = false;
+function carregarClima() {
+  if (climaBuscando || (clima && Date.now() - clima.t < 3600e3 && clima.local === CLIMA_LOCAL.nome)) return;
+  climaBuscando = true;
+  fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CLIMA_LOCAL.lat}&longitude=${CLIMA_LOCAL.lon}&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=America%2FSao_Paulo&forecast_days=7`)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(j => { clima = { t: Date.now(), local: CLIMA_LOCAL.nome, j }; try { localStorage.setItem('clima', JSON.stringify(clima)); } catch { } if (vista === 'painel') render(); })
+    .catch(e => console.warn('clima', e)).finally(() => { climaBuscando = false; });
+}
+function tempo(code) {
+  const c = +code;
+  if (c === 0) return ['☀️', 'Céu limpo']; if (c <= 2) return ['🌤️', 'Poucas nuvens']; if (c === 3) return ['☁️', 'Nublado'];
+  if (c <= 48) return ['🌫️', 'Neblina']; if (c <= 57) return ['🌦️', 'Garoa']; if (c <= 67) return ['🌧️', 'Chuva']; if (c <= 77) return ['🌨️', 'Neve'];
+  if (c <= 82) return ['🌧️', 'Pancadas de chuva']; return ['⛈️', 'Tempestade'];
+}
+function widgetClima() {
+  carregarClima();
+  if (!clima) return `<section class="card clima"><h3>Clima · ${CLIMA_LOCAL.nome}</h3><div class="empty">Buscando a previsão…</div></section>`;
+  const j = clima.j, cur = j.current || {}, d = j.daily || {}, [ic, desc] = tempo(cur.weather_code);
+  const dias = (d.time || []).map((t, i) => ({ t, ic: tempo(d.weather_code[i])[0], max: Math.round(d.temperature_2m_max[i]), min: Math.round(d.temperature_2m_min[i]), pp: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null, mm: d.precipitation_sum ? d.precipitation_sum[i] : 0 }));
+  const chuva = dias.filter(x => x.pp >= 60 && x.mm >= 2 && parseYmd(x.t).getDay() % 6 !== 0);
+  return `<section class="card clima"><div class="sec-h"><h3>Clima · ${CLIMA_LOCAL.nome}</h3><span class="hint">Open-Meteo</span></div>
+    <div class="cl-agora"><span class="cl-ic">${ic}</span><b>${Math.round(cur.temperature_2m)}°</b><div><div>${desc}</div><div class="hint">Umidade ${cur.relative_humidity_2m ?? '–'}% · vento ${Math.round(cur.wind_speed_10m || 0)} km/h</div></div></div>
+    <div class="cl-dias">${dias.map(x => { const dd = parseYmd(x.t); return `<div class="cl-d ${x.t === ymd(hoje0()) ? 'hoje' : ''}" title="${x.mm ? x.mm.toFixed(1) + ' mm' : 'sem chuva'}"><span>${x.t === ymd(hoje0()) ? 'hoje' : DIAS[dd.getDay()]}</span><i>${x.ic}</i><b>${x.max}°</b><small>${x.min}°</small>${x.pp != null ? `<em class="${x.pp >= 60 ? 'alta' : ''}">💧${x.pp}%</em>` : ''}</div>`; }).join('')}</div>
+    ${chuva.length ? `<div class="cl-alerta">Chuva forte prevista em dia útil: <b>${chuva.map(x => DIAS[parseYmd(x.t).getDay()] + ' ' + parseYmd(x.t).getDate()).join(', ')}</b>. Vale avisar as obras.</div>` : ''}</section>`;
+}
+function demandasAbertas(ini, fim) {
+  const out = [];
+  D.itens.forEach(it => {
+    if (!it.demanda || !it.data || filtrado(it)) return;
+    if (it.data < ymd(ini) || it.data > ymd(fim)) return;
+    out.push({ k: 'item', it, data: it.data, hora: '', titulo: it.titulo, cor: corItem(it), feito: !!it.concluidas[it.data] });
+  });
+  return out;
+}
 function vPainel() {
   const h = hoje0(), hs = ymd(h), m0 = new Date(h.getFullYear(), h.getMonth(), 1), iniM = domingo(m0), fimM = addDays(iniM, 41);
   carregarEventos(iniM < domingo(h) ? iniM : domingo(h), fimM > addDays(h, 14) ? fimM : addDays(h, 14));
-  const hojeL = entradas(h, h), atr = atrasadosItens(h), pc = pendenciasControle();
-  const prox = entradas(addDays(h, 1), addDays(h, 14)).filter(x => x.k === 'item' && x.it.tipo === 'entrega');
-  const semIni = domingo(h), semFim = addDays(semIni, 6);
-  const tarefasSem = entradas(semIni, semFim).filter(x => x.k === 'item' && x.it.tipo !== 'reuniao' && !x.it.avisoDe).concat(controleEntre(semIni, semFim));
-  const feitosSem = tarefasSem.filter(x => x.feito).length;
+  const agora = new Date(), minAgora = agora.getHours() * 60 + agora.getMinutes();
+  const hojeL = entradas(h, h).filter(x => !(x.k === 'item' && (x.it.demanda || x.it.avisoDe)));
+  const comHora = hojeL.filter(x => x.hora), diaTodo = hojeL.filter(x => !x.hora);
+  const proxima = comHora.find(x => hm2min(x.hora) > minAgora), atual = comHora.find(x => hm2min(x.hora) <= minAgora && hm2min(x.fim || x.hora) > minAgora);
+  // demandas e controle
+  const pc = pendenciasControle(), semIni = domingo(h), semFim = addDays(semIni, 6);
+  const dem = demandasAbertas(addDays(h, -120), addDays(h, 7));
+  const ctlProx = controleEntre(addDays(h, 1), addDays(h, 7)).filter(x => !x.feito);
+  const atrasadas = dem.filter(x => !x.feito && x.data < hs).concat(pc.filter(x => x.data < hs)).sort((a, b) => a.data.localeCompare(b.data));
+  const deHoje = dem.filter(x => !x.feito && x.data === hs).concat(pc.filter(x => x.data === hs));
+  const proximas = dem.filter(x => !x.feito && x.data > hs).concat(ctlProx).sort((a, b) => a.data.localeCompare(b.data));
+  const semana = demandasAbertas(semIni, semFim).concat(controleEntre(semIni, semFim)), feitosSem = semana.filter(x => x.feito).length;
   const reunHoje = hojeL.filter(x => (x.k === 'ev' && ehReuniao(x.e)) || (x.k === 'item' && x.it.tipo === 'reuniao'));
-  const pendHoje = hojeL.filter(x => x.k === 'item' && !x.feito && x.it.tipo !== 'reuniao').length + pc.filter(x => x.data === hs).length;
-  const nAtr = atr.length + pc.filter(x => x.data < hs && !x.alerta).length;
+  const lin = (x, o) => x.k === 'ctl' ? linhaCtl(x, o) : linha(x, Object.assign({ dataNaLinha: true }, o));
+  const grupo = (tit, l, cls, max) => l.length ? `<div class="dg ${cls || ''}"><h4>${tit}<span>${l.length}</span></h4>${l.slice(0, max).map(x => lin(x, { late: cls === 'alerta' })).join('')}${l.length > max ? `<button class="btn sm ghost" data-v-ir="tarefas">+ ${l.length - max} em Tarefas</button>` : ''}</div>` : '';
+  // por empresa (semana)
+  const EMP = [['rnunes', 'R. Nunes'], ['jf', 'JF'], ['sigo', 'SIGO'], ['pessoal', 'Pessoal']];
+  const empDe = x => { const p = x.k === 'ctl' ? x.p : projeto(x.it.projetoId); return p ? (p.categoria === 'pessoal' ? 'pessoal' : chaveEmpresa(p.areaId)) : ''; };
+  const corDe = k => { const p = D.projetos.find(p => (p.categoria === 'pessoal' ? 'pessoal' : chaveEmpresa(p.areaId)) === k); return p ? corEmpresa(p) : '#94a3b8'; };
+  const emp = EMP.map(([k, n]) => { const l = semana.filter(x => empDe(x) === k); return { k, n, tot: l.length, ok: l.filter(x => x.feito).length, atr: atrasadas.filter(x => empDe(x) === k).length, cor: corDe(k) }; }).filter(e => e.tot || e.atr);
   // mini-mês
   const entM = entradas(iniM, fimM), ctlM = controleEntre(iniM, fimM);
   let mini = `<div class="minical">${[0, 1, 2, 3, 4, 5, 6].map(i => `<span class="mh">${DIAS[i][0]}</span>`).join('')}`;
   for (let i = 0; i < 42; i++) {
-    const dd = addDays(iniM, i), d = ymd(dd), n = entM.filter(x => x.data === d).length, nc = ctlM.filter(x => x.data === d && !x.feito).length;
-    mini += `<button class="md ${dd.getMonth() !== m0.getMonth() ? 'fora' : ''} ${d === hs ? 'hoje' : ''}" data-dia="${d}" title="${n} compromisso(s)${nc ? ', ' + nc + ' pendência(s)' : ''}">${dd.getDate()}<i>${n ? '<b></b>' : ''}${nc ? '<b class="c"></b>' : ''}</i></button>`;
+    const dd = addDays(iniM, i), d = ymd(dd), n = entM.filter(x => x.data === d && !(x.k === 'item' && x.it.demanda)).length, nc = entM.filter(x => x.data === d && x.k === 'item' && x.it.demanda && !x.feito).length + ctlM.filter(x => x.data === d && !x.feito).length;
+    mini += `<button class="md ${dd.getMonth() !== m0.getMonth() ? 'fora' : ''} ${d === hs ? 'hoje' : ''}" data-dia="${d}" title="${n} compromisso(s)${nc ? ', ' + nc + ' demanda(s)' : ''}">${dd.getDate()}<i>${n ? '<b></b>' : ''}${nc ? '<b class="c"></b>' : ''}</i></button>`;
   }
   mini += '</div>';
-  // obras
-  const obras = D.projetos.filter(p => p.categoria !== 'pessoal').map(p => {
-    const t = CATEGORIAS[p.categoria] ? tarefasControle(p, h, addDays(h, 45)).filter(x => !x.feito) : [];
-    const pend = pc.filter(x => x.p.id === p.id).length + atr.filter(x => x.it.projetoId === p.id).length;
-    const reun = D.itens.filter(i => i.projetoId === p.id && i.tipo === 'reuniao' && i.data >= hs).sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora))[0];
-    return { p, prox: t[0], pend, reun };
-  }).filter(o => o.pend || o.prox || o.reun).sort((a, b) => b.pend - a.pend || (a.prox ? a.prox.data : '9').localeCompare(b.prox ? b.prox.data : '9')).slice(0, 8);
-  const tile = (n, rot, cls) => `<div class="kpi ${cls || ''}"><b>${n}</b><span>${rot}</span></div>`;
+  const tile = (n, rot, cls, v) => `<button class="kpi ${cls || ''}" ${v ? `data-v-ir="${v}"` : ''}><b>${n}</b><span>${rot}</span></button>`;
+  const emMin = x => { const m = hm2min(x.hora) - minAgora; return m < 60 ? `em ${m} min` : `em ${Math.floor(m / 60)}h${pad(m % 60)}`; };
+  const agendaHtml = comHora.map(x => {
+    const ini = hm2min(x.hora), fimM2 = hm2min(x.fim || x.hora), passou = fimM2 <= minAgora && !(x === atual);
+    const tag = x === atual ? '<span class="tag agora">agora</span>' : x === proxima ? `<span class="tag prox">${emMin(x)}</span>` : '';
+    const ref = x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`;
+    const link = x.k === 'ev' ? ((x.e.onlineMeeting && x.e.onlineMeeting.joinUrl) || '') : (x.it.linkReuniao || '');
+    return `<div class="ag ${passou ? 'passou' : ''} ${x === atual ? 'atual' : ''}"><span class="ag-h">${x.hora}<small>${x.fim || ''}</small></span><i style="background:${x.cor}"></i><div class="ag-t" ${ref}>${tituloHtml(x)}${tag}</div>${link && !passou ? `<a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Entrar</a>` : ''}</div>`;
+  }).join('');
   return `<div class="painel">
     <section class="ola card">
       <div><h2>${saudacao()}${conta && conta.name ? ', ' + esc(conta.name.split(' ')[0]) : ''}</h2>
-        <p class="hint">${DIAS_L[h.getDay()].charAt(0).toUpperCase() + DIAS_L[h.getDay()].slice(1)}, ${h.getDate()} de ${MESES[h.getMonth()]}</p></div>
-      <div class="kpis">${tile(pendHoje, 'para hoje')}${tile(nAtr, 'atrasadas', nAtr ? 'alerta' : '')}${tile(reunHoje.length, reunHoje.length === 1 ? 'reunião hoje' : 'reuniões hoje')}
-        <div class="kpi anel">${anel(feitosSem, tarefasSem.length, 'var(--salvia)')}<span><b>${feitosSem}/${tarefasSem.length}</b> na semana</span></div></div>
+        <p class="hint">${DIAS_L[h.getDay()].charAt(0).toUpperCase() + DIAS_L[h.getDay()].slice(1)}, ${h.getDate()} de ${MESES[h.getMonth()]}${proxima ? ` · próximo: <b>${esc(proxima.hora)}</b> ${esc(tituloAgendaCurto(proxima))}` : ''}</p></div>
+      <div class="kpis">${tile(deHoje.length, 'demandas hoje', '', 'tarefas')}${tile(atrasadas.length, 'atrasadas', atrasadas.length ? 'alerta' : '', 'tarefas')}${tile(reunHoje.length, reunHoje.length === 1 ? 'reunião hoje' : 'reuniões hoje', '', 'calendario')}
+        <div class="kpi anel">${anel(feitosSem, semana.length, 'var(--salvia)')}<span><b>${feitosSem}/${semana.length}</b> feitas na semana</span></div></div>
     </section>
     <div class="col-a">
       <section class="card"><div class="sec-h"><h3>Agenda de hoje</h3><button class="btn sm" data-v-ir="calendario">Abrir calendário</button></div>
-        ${hojeL.length ? hojeL.map(x => linha(x)).join('') : '<div class="empty">Dia livre. Use + Novo para planejar algo.</div>'}</section>
-      ${pc.length ? `<section class="card"><h3>Pendências de controle (${pc.length})</h3>${pc.map(x => linhaCtl(x)).join('')}</section>` : ''}
-      ${atr.length ? `<section class="card"><h3>Atrasados</h3>${atr.map(x => linha(x, { dataNaLinha: true, late: true })).join('')}</section>` : ''}
+        ${diaTodo.length ? `<div class="ag-dia">${diaTodo.map(x => `<span class="adchip" style="${estiloSA(x.sa, x.cor)}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`}>${tituloHtml(x)}</span>`).join('')}</div>` : ''}
+        ${agendaHtml || '<div class="empty">Nenhum compromisso com horário hoje.</div>'}</section>
+      <section class="card"><div class="sec-h"><h3>Demandas</h3><button class="btn sm" data-v-ir="tarefas">Abrir Tarefas</button></div>
+        ${grupo('Atrasadas', atrasadas, 'alerta', 6)}${grupo('Hoje', deHoje, 'hoje', 8)}${grupo('Próximos 7 dias', proximas, '', 6)}
+        ${atrasadas.length + deHoje.length + proximas.length ? '' : '<div class="empty">Nenhuma demanda em aberto. 🎉</div>'}</section>
     </div>
     <div class="col-b">
-      <section class="card"><div class="sec-h"><h3 style="text-transform:capitalize">${MESES[m0.getMonth()]}</h3><span class="hint"><b class="ponto"></b> compromissos <b class="ponto c"></b> pendências</span></div>${mini}</section>
-      ${obras.length ? `<section class="card"><div class="sec-h"><h3>Obras e projetos</h3><button class="btn sm" data-v-ir="projetos">Ver todos</button></div><div class="obras">${obras.map(o => `
-        <button class="obra" data-selproj="${o.p.id}" style="--c:${corCtl(o.p)}">
-          <span class="on">${esc(o.p.nome)}</span>
-          <span class="oc">${CATEGORIAS[o.p.categoria] ? esc(CATEGORIAS[o.p.categoria].nome) : 'Sem categoria'}${o.p.local ? ' · ' + esc(o.p.local) : ''}</span>
-          ${o.prox ? `<span class="op">Próximo: ${esc(o.prox.titulo)} · ${fmtData(o.prox.data)}</span>` : ''}
-          ${o.reun ? `<span class="op">Reunião: ${fmtData(o.reun.data)}${o.reun.hora ? ' ' + o.reun.hora : ''}</span>` : ''}
-          ${o.pend ? `<span class="ob">${o.pend}</span>` : ''}</button>`).join('')}</div></section>` : ''}
-      <section class="card"><h3>Próximas entregas</h3>${prox.length ? prox.map(x => linha(x, { dataNaLinha: true })).join('') : '<div class="empty">Nenhuma entrega nos próximos 14 dias.</div>'}</section>
+      ${widgetClima()}
+      ${emp.length ? `<section class="card"><div class="sec-h"><h3>Semana por empresa</h3><span class="hint">feitas / total</span></div>${emp.map(e => `<div class="emp"><span class="emp-n"><i style="background:${e.cor}"></i>${e.n}</span><div class="emp-b"><b style="width:${e.tot ? Math.round(100 * e.ok / e.tot) : 0}%;background:${e.cor}"></b></div><span class="emp-c">${e.ok}/${e.tot}${e.atr ? ` <em>${e.atr} atrasada${e.atr > 1 ? 's' : ''}</em>` : ''}</span></div>`).join('')}</section>` : ''}
+      <section class="card"><div class="sec-h"><h3 style="text-transform:capitalize">${MESES[m0.getMonth()]}</h3><span class="hint"><b class="ponto"></b> agenda <b class="ponto c"></b> demandas</span></div>${mini}</section>
     </div></div>`;
 }
+function tituloAgendaCurto(x) { const t = String(x.titulo || ''); return t.length > 48 ? t.slice(0, 46) + '…' : t; }
 let tFiltro = { proj: '', cat: '', q: '', rotinas: false };
 function vTarefas() {
   const h = hoje0(), hs = ymd(h), fim = addDays(refSemana, 6) > addDays(h, 7) ? addDays(refSemana, 6) : addDays(h, 7), ini0 = refSemana < addDays(h, -30) ? refSemana : addDays(h, -30);
