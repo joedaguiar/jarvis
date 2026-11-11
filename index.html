@@ -168,7 +168,20 @@ body.mini #outlookStatus .dot{margin:3px}
 .wk .hrs{position:relative}
 .wk .hr:first-child{visibility:hidden}
 .wk .hd{position:relative}
-.hdots{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;gap:11px;row-gap:9px;align-items:center;max-width:45%;flex-wrap:wrap;justify-content:flex-end}
+.hdots{position:absolute;top:50%;transform:translateY(-50%);display:flex;gap:10px;row-gap:8px;align-items:center;max-width:calc(50% - 26px);flex-wrap:wrap}
+.hdots.esq{left:10px;justify-content:flex-start}
+.hdots.dir{right:10px;justify-content:flex-end}
+.wk .hd.hoje{background:rgba(232,105,63,.07);box-shadow:inset 0 3px 0 var(--coral)}
+.wk .hd.hoje .dn{box-shadow:0 3px 10px rgba(232,105,63,.35)}
+.fbtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer}
+.fbtn svg{width:15px;height:15px}
+.fbtn .n{background:var(--coral);color:#fff;border-radius:999px;font-size:10.5px;padding:0 6px;line-height:16px}
+.rnbtn{height:32px;min-width:44px;padding:0 10px;border-radius:999px;border:2px solid #152033;background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+.rnbtn svg{height:22px;width:auto;display:block}
+.rnbtn .txt{font-weight:800;font-size:12.5px;color:#7c3aed;letter-spacing:.3px}
+.rnbtn.off{border-color:var(--line);background:#f1f1f1}
+.rnbtn.off svg{filter:grayscale(1);opacity:.35}
+.rnbtn.off .txt{color:#9ca3af;text-decoration:line-through}
 .hdots .pd{width:10px;height:10px;flex:none;border-radius:50%;cursor:pointer;display:block}
 .hdots .pd.ok{opacity:.35}
 .hdots b{font-size:10px;color:var(--muted)}
@@ -379,6 +392,19 @@ const corItem = it => (it.demanda && projeto(it.projetoId) ? corDemanda(projeto(
 // cor da empresa (borda/anel): R. Nunes roxo, JF laranja, SIGO azul, Pessoal verde
 function corEmpresa(p) { const a = area(p.areaId); return p.categoria === 'pessoal' ? '#16a34a' : (a && a.cor) || '#64748b'; }
 function corDemanda(p) { return corEmpresa(p); }
+function chaveEmpresa(areaId) {
+  const n = normTxt((area(areaId) || {}).nome || '').trim();
+  return /nunes/.test(n) ? 'rnunes' : /^jf/.test(n) ? 'jf' : /sigo|magi/.test(n) ? 'sigo' : /pessoal/.test(n) ? 'pessoal' : '';
+}
+function empresaDaEntrada(x) {
+  const p = projetoDaEntrada(x); if (p) return p.categoria === 'pessoal' ? 'pessoal' : chaveEmpresa(p.areaId);
+  if (x.k === 'item') { const a = chaveEmpresa(areaDoItem(x.it)); if (a) return a; }
+  const cal = x.k === 'item' ? calendarioDoItem(x.it) : (x.e && x.e._cal && x.e._cal.id);
+  if (cal && chaveFiltro(cal) === chaveRN()) return 'rnunes';
+  return '';
+}
+const LOGO_RN = `<svg viewBox="575 170 782 1098" aria-label="R. Nunes"><g fill="#152033"><path d="M590 402h157L590 559zM1186 398h156v156zM590 570l171 171-171 171zM1342 570l-171 171 171 171zM590 928l164 164H590zM1342 928l-165 164h165zM633 561l154-153 153 153-153 154zM991 561l154-153 153 153-153 154z"/></g><g fill="#35465d"><path d="M812 741l154-154 153 154-153 154zM633 920l154-153 153 153-153 154zM991 920l154-153 153 153-153 154zM812 1099l154-153 153 153-153 154z"/></g><g fill="#ed7022"><circle cx="966" cy="217" r="32"/><path d="M812 382l29-28v-81h73l52-48 53 48h71v81l29 28-153 154z"/></g></svg>`;
+function chaveRN() { const g = gruposFiltro().find(g => /rodrigo nunes|r\.? ?nunes/i.test(g.nome)); return g ? g.k : 'grp:Rodrigo Nunes'; }
 function areaDoItem(it) {
   const p = projeto(it.projetoId); if (p) return p.areaId;
   const cal = calendarioDoItem(it), a = D.areas.find(a => a.calendarioId && a.calendarioId === cal);
@@ -1060,9 +1086,10 @@ function renderFiltros() {
   const show = ['painel', 'semana', 'calendario'].includes(vista);
   if (!show) { $('#filtros').innerHTML = ''; return; }
   const gs = gruposFiltro(), on = gs.filter(g => !filtroOff.has(g.k)).length;
-  $('#filtros').innerHTML = `<div style="position:relative">
-    <button class="chip" data-acao="abrirFiltro" title="Filtrar agendas">${gs.slice(0, 6).map(g => `<span class="sw" style="background:${g.cor};${filtroOff.has(g.k) ? 'opacity:.25' : ''}"></span>`).join('')}
-      Agendas ${on === gs.length ? '(todas)' : `(${on} de ${gs.length})`} ▾</button>
+  const kRN = chaveRN(), temRN = gs.some(g => g.k === kRN), rnOff = filtroOff.has(kRN), nOff = gs.length - on;
+  $('#filtros').innerHTML = `<div style="position:relative;display:flex;gap:8px;align-items:center">
+    ${temRN ? `<button class="rnbtn ${rnOff ? 'off' : ''}" data-acao="toggleRN" title="${rnOff ? 'Mostrar' : 'Ocultar'} agendas da R. Nunes">${LOGO_RN}</button>` : ''}
+    <button class="fbtn" data-acao="abrirFiltro" title="Filtrar agendas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>Filtro${nOff ? `<span class="n">${nOff}</span>` : ''}</button>
     ${filtroAberto ? `<div id="filtroPop" style="position:absolute;right:0;top:34px;z-index:40;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:8px;min-width:240px;max-height:60vh;overflow:auto">
       ${gs.map(g => `<label class="cb" style="margin:0;padding:6px 8px;border-radius:6px;cursor:pointer"><input type="checkbox" data-filtro="${esc(g.k)}" ${filtroOff.has(g.k) ? '' : 'checked'}><span class="sw" style="background:${g.cor}"></span>${esc(g.nome)}${g.n > 1 ? `<span class="hint">(${g.n})</span>` : ''}</label>`).join('') || '<div class="empty" style="padding:8px">Nenhuma agenda exibida.</div>'}
       <div style="display:flex;gap:6px;border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><button class="btn sm" data-acao="filtroTodas">Todas</button><button class="btn sm" data-acao="filtroNenhuma">Nenhuma</button><span style="flex:1"></span><button class="btn sm" data-v="config" data-acao="irConfig">Agrupar…</button></div>
@@ -1239,8 +1266,11 @@ function vCalendario() {
   let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent, '52px')};--px:${PX}px"><div class="hd"></div>`;
   for (let i = 0; i < 7; i++) {
     const dd = addDays(ini, i), d = ymd(dd), dt = ent.filter(x => x.data === d && !x.hora);
-    const pts = dt.map(x => { const p = projetoDaEntrada(x), cp = p ? tagProjeto(p).cor : x.cor; return `<i class="pd ${x.feito ? 'ok' : ''}" style="background:${cp};box-shadow:0 0 0 2px #fff,0 0 0 3.5px ${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc((p ? tagProjeto(p).nome + ' · ' : '') + x.titulo)}"></i>`; });
-    g += `<div class="hd ${d === hs ? 'hoje' : ''}"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${pts.length ? `<span class="hdots">${pts.slice(0, 6).join('')}${pts.length > 6 ? `<b>+${pts.length - 6}</b>` : ''}</span>` : ''}</div>`;
+    const ord = { rnunes: 0, jf: 1, sigo: 2, pessoal: 3 }, dots = l => l.map(x => { const p = projetoDaEntrada(x), cp = p ? tagProjeto(p).cor : x.cor; return `<i class="pd ${x.feito ? 'ok' : ''}" style="background:${cp};box-shadow:0 0 0 2px #fff,0 0 0 3.5px ${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc((p ? tagProjeto(p).nome + ' · ' : '') + x.titulo)}"></i>`; });
+    const comE = dt.map(x => ({ x, e: empresaDaEntrada(x) })), esq = comE.filter(o => o.e === 'rnunes').map(o => o.x),
+      dir = comE.filter(o => o.e !== 'rnunes').sort((a, b) => (ord[a.e] ?? 9) - (ord[b.e] ?? 9)).map(o => o.x);
+    const bloco = (l, lado) => l.length ? `<span class="hdots ${lado}">${dots(l.slice(0, 4)).join('')}${l.length > 4 ? `<b>+${l.length - 4}</b>` : ''}</span>` : '';
+    g += `<div class="hd ${d === hs ? 'hoje' : ''}"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${bloco(esq, 'esq')}${bloco(dir, 'dir')}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
@@ -1678,6 +1708,7 @@ document.addEventListener('click', async ev => {
     case 'salvarSerie': return salvarSerie();
     case 'excluirSerie': return excluirSerie();
     case 'ativarCat': return ativarCategorias();
+    case 'toggleRN': { const k = chaveRN(); filtroOff.has(k) ? filtroOff.delete(k) : filtroOff.add(k); gravarFiltro(); return render(); }
     case 'abrirFiltro': filtroAberto = !filtroAberto; return renderFiltros();
     case 'filtroTodas': filtroOff.clear(); gravarFiltro(); return render();
     case 'filtroNenhuma': gruposFiltro().forEach(g => filtroOff.add(g.k)); gravarFiltro(); return render();
