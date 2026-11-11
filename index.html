@@ -131,6 +131,18 @@ body.mini #outlookStatus .dot{margin:3px}
 .tfiltros #tfQ,.tfiltros select{border:1px solid var(--areia);border-radius:10px;padding:7px 10px;background:#fff}
 .tfiltros #tfQ{min-width:220px}
 .tfiltros .cb{white-space:nowrap}
+.abas{display:flex;gap:4px;background:rgba(255,255,255,.45);border-radius:999px;padding:4px;width:max-content;margin-bottom:14px}
+.abas button{border:0;background:none;font:inherit;font-weight:600;font-size:13.5px;padding:7px 16px;border-radius:999px;cursor:pointer;color:var(--muted)}
+.abas button.on{background:var(--papel);color:var(--ink);box-shadow:var(--sombra)}
+#nav2{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.tsem{overflow-x:auto}
+.tsem .qcol{min-height:calc(100vh - 190px);display:flex;flex-direction:column}
+.tsem .qcol h3 .dw{font-style:normal;font-weight:500;color:var(--muted);font-size:13px}.tsem .qcol h3 .dw b{color:var(--ink);text-transform:capitalize;font-weight:700}
+.tsem .qcol.hoje{background:rgba(232,105,63,.07);box-shadow:inset 0 3px 0 var(--coral)}
+.tsem .qcol.hoje h3 .dw b{color:var(--coral)}
+.tsem .qcol.estreita{padding:10px 4px}.tsem .qcol.estreita h3{flex-direction:column;gap:2px;margin:2px 0 10px}.tsem .qcol.estreita h3 .dn{font-size:16px}.tsem .qcol.estreita h3 .dw{font-size:11px}
+.tadd{margin-top:auto;border:1px dashed var(--line);background:transparent;border-radius:10px;padding:5px;color:var(--muted);cursor:pointer;font-size:15px;opacity:.6}
+.tadd:hover{opacity:1;background:var(--papel)}
 .quadro{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:12px;align-items:start;overflow-x:auto;padding-bottom:6px}
 .qcol{background:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.6);border-radius:18px;padding:10px;min-height:120px}
 .qcol h3{display:flex;justify-content:space-between;align-items:center;margin:2px 4px 10px;font-size:14px;font-weight:700}
@@ -168,15 +180,18 @@ body.mini #outlookStatus .dot{margin:3px}
 .wk .hrs{position:relative}
 .wk .hr:first-child{visibility:hidden}
 .wk .hd{position:relative}
+.wk .hd[data-hdia]{cursor:pointer}
+.wk .hd[data-hdia]:hover{background:rgba(255,255,255,.5)}
+.wk .hd.hoje[data-hdia]:hover{background:rgba(232,105,63,.12)}
 .hdots{position:absolute;top:50%;transform:translateY(-50%);display:flex;gap:10px;row-gap:8px;align-items:center;max-width:calc(50% - 26px);flex-wrap:wrap}
 .hdots.esq{left:10px;justify-content:flex-start}
 .hdots.dir{right:10px;justify-content:flex-end}
 .wk .hd.hoje{background:rgba(232,105,63,.07);box-shadow:inset 0 3px 0 var(--coral)}
 .wk .hd.hoje .dn{box-shadow:0 3px 10px rgba(232,105,63,.35)}
-.fbtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer}
+.fbtn{position:relative;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;width:92px;padding:0;border-radius:999px;border:1px solid var(--line);background:#fff;font:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer}
 .fbtn svg{width:15px;height:15px}
-.fbtn .n{background:var(--coral);color:#fff;border-radius:999px;font-size:10.5px;padding:0 6px;line-height:16px}
-.rnbtn{height:32px;min-width:44px;padding:0 10px;border-radius:999px;border:2px solid #152033;background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+.fbtn .n{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;box-sizing:border-box;background:var(--coral);color:#fff;border-radius:999px;font-size:10px;padding:0 4px;line-height:17px;text-align:center;box-shadow:0 0 0 2px var(--linho)}
+.rnbtn{box-sizing:border-box;height:34px;width:54px;padding:0;border-radius:999px;border:2px solid #152033;background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
 .rnbtn svg{height:22px;width:auto;display:block}
 .rnbtn .txt{font-weight:800;font-size:12.5px;color:#7c3aed;letter-spacing:.3px}
 .rnbtn.off{border-color:var(--line);background:#f1f1f1}
@@ -254,13 +269,14 @@ body.arrastando,body.arrastando *{user-select:none!important}
 .toast.err{background:var(--danger)}
 table.cfg{border-collapse:collapse;width:100%}
 table.cfg td{padding:6px 4px;border-bottom:1px solid var(--line-2);vertical-align:middle}
-body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemanda{display:none}
+body.login #nav,body.login #nav2{display:none}
 @media (max-width:1100px){.painel{grid-template-columns:1fr}.kpis{margin-left:0}}
 @media (max-width:820px){
   #app{flex-direction:column}
   #side,body.mini #side{width:auto;order:2;flex-direction:row;padding:4px 6px}
   #side h1,#side .grow,#outlookStatus,#btnMini{display:none}
-  #side nav{display:flex;width:100%;justify-content:space-around}
+  #side nav{display:flex;width:auto;flex:1;justify-content:space-around}
+  #side #nav2{flex:none;margin:0}
   #side nav button,body.mini #side nav button{flex-direction:column;gap:1px;padding:8px 10px;width:auto;margin:0}
   #main{order:1;min-height:0}
   #top{padding:10px 12px 6px;gap:6px}
@@ -296,12 +312,12 @@ body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemand
   <nav id="nav">
     <button data-v="painel" title="Painel"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="9" rx="2"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="2"/><rect x="13.5" y="11.5" width="7.5" height="9.5" rx="2"/><rect x="3" y="15" width="7.5" height="6" rx="2"/></svg></span><span class="tx">Painel</span></button>
     <button data-v="calendario" title="Calendário"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/></svg></span><span class="tx">Calendário</span></button>
-    <button data-v="semana" title="Semana"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16.5" rx="3"/><path d="M9 4v16.5M15 4v16.5"/></svg></span><span class="tx">Semana</span></button>
     <button data-v="tarefas" title="Tarefas"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5l1.8 1.8L9.2 5M4 13.5l1.8 1.8L9.2 12"/><path d="M12.5 7h7.5M12.5 14h7.5M4.5 19.5h15.5"/></svg></span><span class="tx">Tarefas</span></button>
-    <button data-v="projetos" title="Empresas e projetos"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2h7.5A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><path d="M8 11.5v4.5M12 11.5v2.5M16 11.5v3.5"/></svg></span><span class="tx">Empresas e projetos</span></button>
-    <button data-v="config" title="Configurações"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h9M17.5 6.5H20M4 12h3M11.5 12H20M4 17.5h11M19 17.5h1"/><circle cx="15.5" cy="6.5" r="2"/><circle cx="9.5" cy="12" r="2"/><circle cx="17" cy="17.5" r="2"/></svg></span><span class="tx">Configurações</span></button>
   </nav>
   <div class="grow"></div>
+  <nav id="nav2">
+    <button data-v="config" title="Configurações"><span class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h9M17.5 6.5H20M4 12h3M11.5 12H20M4 17.5h11M19 17.5h1"/><circle cx="15.5" cy="6.5" r="2"/><circle cx="9.5" cy="12" r="2"/><circle cx="17" cy="17.5" r="2"/></svg></span><span class="tx">Configurações</span></button>
+  </nav>
   <div id="outlookStatus"></div>
   <button id="btnMini" title="Expandir/recolher menu">»</button>
 </aside>
@@ -309,9 +325,6 @@ body.login #nav,body.login #btnNovo,body.login #btnReuniao,body.login #btnDemand
   <div id="top">
     <h2 id="titulo">Hoje</h2>
     <div id="filtros"></div>
-    <button class="btn" id="btnDemanda">+ Demanda</button>
-    <button class="btn" id="btnReuniao">+ Reunião</button>
-    <button class="btn pri" id="btnNovo">+ Novo</button>
   </div>
   <div id="view"></div>
 </div>
@@ -1066,11 +1079,12 @@ function linha(x, opts = {}) {
 
 /* ================= views ================= */
 let vista = 'calendario', refSemana = domingo(hoje0()), refCal = hoje0(), modoCal = 'semana', selProj = null;
-const TITULOS = { painel: 'Painel', tarefas: 'Tarefas', hoje: 'Painel', semana: 'Semana', calendario: 'Calendário', projetos: 'Empresas e projetos', config: 'Configurações' };
+const TITULOS = { painel: 'Painel', tarefas: 'Tarefas', hoje: 'Painel', semana: 'Semana', calendario: 'Calendário', projetos: 'Configurações', config: 'Configurações' };
 function irPara(v) { vista = v; render(); }
 function render() {
   if (drag && drag.ativo) return;
-  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === vista));
+  if (vista === 'semana') vista = 'tarefas';
+  $$('#nav button, #nav2 button').forEach(b => b.classList.toggle('on', b.dataset.v === vista || (b.dataset.v === 'config' && vista === 'projetos')));
   $('#titulo').textContent = TITULOS[vista];
   renderFiltros(); renderStatus();
   if (vista === 'hoje') vista = 'painel';
@@ -1083,7 +1097,7 @@ function render() {
 }
 let filtroAberto = false;
 function renderFiltros() {
-  const show = ['painel', 'semana', 'calendario'].includes(vista);
+  const show = ['painel', 'tarefas', 'calendario'].includes(vista);
   if (!show) { $('#filtros').innerHTML = ''; return; }
   const gs = gruposFiltro(), on = gs.filter(g => !filtroOff.has(g.k)).length;
   const kRN = chaveRN(), temRN = gs.some(g => g.k === kRN), rnOff = filtroOff.has(kRN), nOff = gs.length - on;
@@ -1176,42 +1190,45 @@ function vPainel() {
 }
 let tFiltro = { proj: '', cat: '', q: '', rotinas: false };
 function vTarefas() {
-  const h = hoje0(), hs = ymd(h), fim = addDays(h, 7);
+  const h = hoje0(), hs = ymd(h), fim = addDays(refSemana, 6) > addDays(h, 7) ? addDays(refSemana, 6) : addDays(h, 7), ini0 = refSemana < addDays(h, -30) ? refSemana : addDays(h, -30);
   const cards = [];
   D.itens.forEach(it => {
     if (it.tipo === 'reuniao' || it.avisoDe) return;
     if (!it.data) { if (!it.concluidas['-']) cards.push({ k: 'item', it, data: '', titulo: it.titulo, feito: false, chave: '-' }); return; }
-    const ocs = it.recorrencia ? ocorrencias(it, addDays(h, -14), fim) : [it.data];
-    ocs.forEach(d => { if (d > ymd(fim) || (d < ymd(addDays(h, -30)))) return; cards.push({ k: 'item', it, data: d, titulo: it.titulo, feito: !!it.concluidas[d], chave: d }); });
+    const ocs = it.recorrencia ? ocorrencias(it, refSemana < addDays(h, -14) ? refSemana : addDays(h, -14), fim) : [it.data];
+    ocs.forEach(d => { if (d > ymd(fim) || d < ymd(ini0)) return; cards.push({ k: 'item', it, data: d, titulo: it.titulo, feito: !!it.concluidas[d], chave: d }); });
   });
-  pendenciasControle().concat(controleEntre(h, fim)).forEach(x => { if (!cards.some(c => c.k === 'ctl' && c.p.id === x.p.id && c.pkey === x.pkey && c.tkey === x.tkey)) cards.push(x); });
+  pendenciasControle().concat(controleEntre(refSemana < h ? refSemana : h, fim)).forEach(x => { if (!cards.some(c => c.k === 'ctl' && c.p.id === x.p.id && c.pkey === x.pkey && c.tkey === x.tkey)) cards.push(x); });
   const pid = c => c.k === 'ctl' ? c.p.id : c.it.projetoId, cat = c => { const p = projeto(pid(c)); return p ? p.categoria || '' : ''; };
   const q = tFiltro.q.trim().toLowerCase();
   cards.sort((a, b) => (a.data || '9').localeCompare(b.data || '9') || ((a.k === 'item' && a.it.hora) || '').localeCompare((b.k === 'item' && b.it.hora) || ''));
   const ehExec = c => c.k === 'ctl' || (c.it.projetoId && projeto(c.it.projetoId) && (projeto(c.it.projetoId).categoria !== 'pessoal' || !c.it.recorrencia));
   const vis = cards.filter(c => (tFiltro.rotinas || ehExec(c)) && (!tFiltro.proj || pid(c) === tFiltro.proj) && (!tFiltro.cat || cat(c) === tFiltro.cat) && (!q || c.titulo.toLowerCase().includes(q)));
-  const colunas = [
-    ['Atrasadas', vis.filter(c => !c.feito && c.data && c.data < hs), 'alerta'],
-    ['Hoje', vis.filter(c => !c.feito && c.data === hs), 'hoje'],
-    ['Próximos 7 dias', vis.filter(c => !c.feito && c.data > hs), ''],
-    ['Sem data', vis.filter(c => !c.feito && !c.data), ''],
-    ['Concluídas', vis.filter(c => c.feito && c.data >= ymd(addDays(h, -7))), 'feitas']
-  ];
   const card = c => {
     const p = projeto(pid(c)), cor = c.k === 'ctl' ? corCtl(c.p) : corItem(c.it);
     const chk = c.k === 'ctl' ? `data-ctl="${c.p.id}|${c.pkey}|${c.tkey}"` : `data-conc="${c.it.id}|${c.chave}"`;
     const abrir = c.k === 'ctl' ? `data-selproj="${c.p.id}"` : `data-item="${c.it.id}"`;
     return `<div class="tcard ${c.feito ? 'done' : ''}" style="--c:${cor}"><input type="checkbox" class="chk" ${chk} ${c.feito ? 'checked' : ''}>
-      <div class="tb" ${abrir}><div class="tt">${esc(c.titulo)}</div><div class="ts">${p ? esc(p.nome) : (c.k === 'item' && c.it.recorrencia ? 'Rotina' : 'Sem projeto')}${c.data ? ' · ' + (c.alerta ? 'desde ' : '') + fmtData(c.data) : ''}</div>
+      <div class="tb" ${abrir}><div class="tt">${esc(c.titulo)}</div><div class="ts">${p ? esc(p.nome) : (c.k === 'item' && c.it.recorrencia ? 'Rotina' : 'Sem projeto')}${c.data && (vista !== 'tarefas' || c.data < ymd(refSemana) || c.alerta) ? ' · ' + (c.alerta ? 'desde ' : '') + fmtData(c.data) : ''}</div>
       ${c.k === 'ctl' && c.acao === 'agendar' && !c.feito ? `<button class="btn sm pri" data-agendar="${c.p.id}|${c.pkey}" style="margin-top:6px">Agendar</button>` : ''}</div></div>`;
   };
-  return `<div class="tfiltros card">
-      <input id="tfQ" placeholder="Buscar tarefa…" value="${esc(tFiltro.q)}">
+  const ini = refSemana, fimS = addDays(ini, 6), esta = ymd(ini) === ymd(domingo(h));
+  const atras = esta ? vis.filter(c => !c.feito && c.data && c.data < ymd(ini)) : [], semData = vis.filter(c => !c.feito && !c.data);
+  const dias = [];
+  for (let i = 0; i < 7; i++) { const dd = addDays(ini, i), d = ymd(dd); dias.push({ dd, d, l: vis.filter(c => c.data === d).sort((a, b) => a.feito - b.feito) }); }
+  const cols = (atras.length ? ['minmax(170px,.9fr)'] : []).concat(dias.map(x => (x.dd.getDay() % 6 === 0) ? (x.l.length ? 'minmax(150px,.7fr)' : 'minmax(56px,.25fr)') : 'minmax(170px,1fr)')).concat(semData.length ? ['minmax(170px,.9fr)'] : []).join(' ');
+  const col = (cls, h3, n, corpo, d) => `<section class="qcol ${cls}" ${d ? `data-tdia="${d}"` : ''}><h3>${h3}${n ? `<span>${n}</span>` : ''}</h3>${corpo}${d ? `<button class="tadd" data-tdia="${d}" title="Nova demanda">+</button>` : ''}</section>`;
+  const html = (atras.length ? col('alerta', 'Atrasadas', atras.length, atras.map(card).join('')) : '')
+    + dias.map(x => { const estreito = x.dd.getDay() % 6 === 0 && !x.l.length, ab = x.l.filter(c => !c.feito).length;
+      return col((x.d === hs ? 'hoje' : '') + (estreito ? ' estreita' : ''), estreito ? `<b class="dw">${DIAS[x.dd.getDay()]}</b><b class="dn">${x.dd.getDate()}</b>` : `<em class="dw"><b>${DIAS_L[x.dd.getDay()].replace('-feira', '')}</b> ${x.dd.getDate()}/${pad(x.dd.getMonth() + 1)}</em>`, estreito ? 0 : ab, x.l.map(card).join(''), x.d); }).join('')
+    + (semData.length ? col('', 'Sem data', semData.length, semData.map(card).join('')) : '');
+  return `<div class="cal-head"><button class="btn" data-acao="semAnt">‹</button><button class="btn" data-acao="semHoje">Hoje</button><button class="btn" data-acao="semProx">›</button>
+      <span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fimS.getDate()} ${MESES[fimS.getMonth()].slice(0, 3)} ${fimS.getFullYear()}</span><span style="flex:1"></span>
+      <div class="tfiltros"><input id="tfQ" placeholder="Buscar…" value="${esc(tFiltro.q)}">
       <select id="tfProj"><option value="">Todos os projetos</option>${optsProjetos(tFiltro.proj)}</select>
       <select id="tfCat"><option value="">Todas as categorias</option>${Object.entries(CATEGORIAS).map(([k, c]) => `<option value="${k}" ${tFiltro.cat === k ? 'selected' : ''}>${c.nome}</option>`).join('')}</select>
-      <label class="cb" style="margin:0"><input type="checkbox" id="tfRot" ${tFiltro.rotinas ? 'checked' : ''}> Mostrar também rotinas pessoais e itens sem projeto</label>
-      <span class="hint" style="margin-left:auto">${vis.filter(c => !c.feito).length} em aberto</span></div>
-    <div class="quadro">${colunas.map(([t, l, cls]) => `<section class="qcol ${cls}"><h3>${t}<span>${l.length}</span></h3>${l.map(card).join('') || '<div class="empty">Nada aqui.</div>'}</section>`).join('')}</div>`;
+      <label class="cb" style="margin:0" title="Mostrar também rotinas pessoais e itens sem projeto"><input type="checkbox" id="tfRot" ${tFiltro.rotinas ? 'checked' : ''}> Rotinas</label></div></div>
+    <div class="quadro tsem" style="grid-template-columns:${cols}">${html}</div>`;
 }
 
 function vSemana() {
@@ -1270,7 +1287,7 @@ function vCalendario() {
     const comE = dt.map(x => ({ x, e: empresaDaEntrada(x) })), esq = comE.filter(o => o.e === 'rnunes').map(o => o.x),
       dir = comE.filter(o => o.e !== 'rnunes').sort((a, b) => (ord[a.e] ?? 9) - (ord[b.e] ?? 9)).map(o => o.x);
     const bloco = (l, lado) => l.length ? `<span class="hdots ${lado}">${dots(l.slice(0, 4)).join('')}${l.length > 4 ? `<b>+${l.length - 4}</b>` : ''}</span>` : '';
-    g += `<div class="hd ${d === hs ? 'hoje' : ''}"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${bloco(esq, 'esq')}${bloco(dir, 'dir')}</div>`;
+    g += `<div class="hd ${d === hs ? 'hoje' : ''}" data-hdia="${d}" title="Clique para criar uma demanda neste dia"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${bloco(esq, 'esq')}${bloco(dir, 'dir')}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
@@ -1312,7 +1329,9 @@ function posicionarCalendario() {
   if (nl) { const m = n.getHours() * 60 + n.getMinutes(); nl.style.display = m < H0 * 60 || m > H1 * 60 ? 'none' : ''; nl.style.top = ((m - H0 * 60) / 60 * PX) + 'px'; }
 }
 
-function vProjetos() {
+function abasConfig() { return `<div class="abas"><button class="${vista === 'config' ? 'on' : ''}" data-v="config">Geral</button><button class="${vista === 'projetos' ? 'on' : ''}" data-v="projetos">Empresas e projetos</button></div>`; }
+function vProjetos() { return abasConfig() + vProjetos0(); }
+function vProjetos0() {
   if (!selProj) selProj = { tipo: 'area', id: D.areas[0] && D.areas[0].id };
   let lista = `<div class="card plist">`;
   D.areas.forEach(a => {
@@ -1374,7 +1393,8 @@ function secoesItens(itens, ctx) {
     sec('entrega', 'Entregas e demandas', 'Nenhuma entrega ou demanda.') + sec('reuniao', 'Reuniões', 'Nenhuma reunião.') + sec('tarefa', 'Tarefas', 'Nenhuma tarefa avulsa.');
 }
 
-function vConfig() {
+function vConfig() { return abasConfig() + vConfig0(); }
+function vConfig0() {
   const c = D.config;
   const listaCals = todosCals();
   const cals = (conectado() || gOk()) ? (listaCals.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Grupo no filtro</b></td><td><b>Pode editar</b></td></tr>${listaCals.map((k, i) => `<tr><td><span class="sw" style="background:${corCal(k, i)}"></span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
@@ -1645,7 +1665,7 @@ document.addEventListener('click', async ev => {
   const cv = t.closest('[data-convite]'); if (cv) { ev.preventDefault(); const it = D.itens.find(i => i.id === cv.dataset.convite); return copiarTexto(textoConvite(it.titulo, it.data, it.hora, it.duracao, it.linkReuniao), 'Convite copiado.'); }
   const ce = t.closest('[data-convite-ev]'); if (ce) { const e = modalEvento._e, sd = e.start.dateTime.slice(0, 10); return copiarTexto(textoConvite(e.subject, sd, e.isAllDay ? '' : e.start.dateTime.slice(11, 16), hm2min(e.end.dateTime.slice(11, 16)) - hm2min(e.start.dateTime.slice(11, 16)), e.onlineMeeting.joinUrl), 'Convite copiado.'); }
   if (t.matches('#modalBg')) return fecharModal();
-  const nav = t.closest('#nav button'); if (nav) return irPara(nav.dataset.v);
+  const nav = t.closest('#nav button, #nav2 button, .abas button'); if (nav) return irPara(nav.dataset.v);
   const vi = t.closest('[data-v-ir]'); if (vi) return irPara(vi.dataset.vIr);
   const conc = t.closest('[data-conc]');
   if (conc) {
@@ -1661,6 +1681,8 @@ document.addEventListener('click', async ev => {
   const dp = t.closest('[data-demanda-proj]'); if (dp) return modalDemanda(null, dp.dataset.demandaProj);
   const eEl = t.closest('[data-ev]');
   if (eEl) { ev.stopPropagation(); const e = eventos.find(x => x.id === eEl.dataset.ev); if (e) modalEvento(e); return; }
+  const hdd = t.closest('.wk .hd[data-hdia]'); if (hdd) return modalDemanda(null, '', { data: hdd.dataset.hdia });
+  const td = t.closest('.tadd[data-tdia]'); if (td) return modalDemanda(null, tFiltro.proj || '', { data: td.dataset.tdia });
   const nd = t.closest('[data-novo-data]'); if (nd) return novoItem({ data: nd.dataset.novoData });
   const nt = t.closest('[data-novo-tipo]'); if (nt) return novoItem(Object.assign({ tipo: nt.dataset.novoTipo }, JSON.parse(nt.dataset.ctx)));
   const cel = t.closest('[data-dia]'); if (cel) { refCal = parseYmd(cel.dataset.dia); modoCal = 'semana'; vista = 'calendario'; return render(); }
@@ -1777,13 +1799,10 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(
 document.addEventListener('input', e => {
   if (e.target.id === 'tfQ') { tFiltro.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#tfQ'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }
 });
-$('#btnNovo').onclick = () => novoItem();
 let tResize; window.addEventListener('resize', () => { clearTimeout(tResize); tResize = setTimeout(() => { if (vista === 'calendario' && modoCal === 'semana') render(); }, 150); });
 function aplicarMini(m) { document.body.classList.toggle('mini', m); $('#btnMini').innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${m ? 'M7 6l6 6-6 6M13 6l6 6-6 6' : 'M17 6l-6 6 6 6M11 6l-6 6 6 6'}"/></svg>`; try { localStorage.setItem('menuMini', m ? '1' : '0'); } catch { } if (D) renderStatus(); }
 $('#btnMini').onclick = () => aplicarMini(!document.body.classList.contains('mini'));
 aplicarMini((() => { try { return localStorage.getItem('menuMini') !== '0'; } catch { return true; } })());
-$('#btnReuniao').onclick = () => novoItem({ tipo: 'reuniao' });
-$('#btnDemanda').onclick = () => modalDemanda(null, selProj && selProj.tipo === 'proj' ? selProj.id : '');
 
 /* ================= vincular eventos existentes ================= */
 const DOW = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
@@ -2279,16 +2298,16 @@ async function adicionarReuniaoOnline() {
 
 /* ================= navegar arrastando para os lados ================= */
 function navegar(dir) {
-  if (vista === 'semana') refSemana = addDays(refSemana, 7 * dir);
+  if (vista === 'tarefas') refSemana = addDays(refSemana, 7 * dir);
   else if (vista === 'calendario' && modoCal === 'mes') refCal = new Date(refCal.getFullYear(), refCal.getMonth() + dir, 1);
   else if (vista === 'calendario') refCal = addDays(refCal, 7 * dir);
   else return;
   render();
 }
 let swipe = null;
-const alvoSwipe = () => $('#view .wk, #view .mes, #view .semana');
+const alvoSwipe = () => $('#view .wk, #view .mes, #view .semana, #view .tsem');
 document.addEventListener('pointerdown', ev => {
-  if (!['semana', 'calendario'].includes(vista) || ev.button !== 0) return;
+  if (!['tarefas', 'calendario'].includes(vista) || ev.button !== 0) return;
   if (!ev.target.closest('#view') || ev.target.closest('.ev.movel, button, input, select, a, textarea, .cal-head')) return;
   swipe = { x: ev.clientX, y: ev.clientY, ativo: false };
 });
@@ -2310,7 +2329,7 @@ document.addEventListener('pointerup', ev => {
 document.addEventListener('pointercancel', () => { if (swipe) { swipe = null; document.body.classList.remove('arrastando'); const el = alvoSwipe(); if (el) { el.style.transform = ''; el.style.opacity = ''; } } });
 let rodaAcum = 0, rodaPausa = 0;
 document.addEventListener('wheel', ev => {
-  if (!['semana', 'calendario'].includes(vista) || $('#modalBg').classList.contains('on')) return;
+  if (!['tarefas', 'calendario'].includes(vista) || $('#modalBg').classList.contains('on')) return;
   if (Math.abs(ev.deltaX) <= Math.abs(ev.deltaY) * 1.2) return;
   if (Date.now() < rodaPausa) return;
   rodaAcum += ev.deltaX;
