@@ -1435,7 +1435,7 @@ function modalItem(it, novo) {
     ${it.vinculado ? `<div class="hint">Vinculado a um evento que já existia na agenda.</div>` : '<div class="hint">Com data, o item é gravado como evento na agenda escolhida.</div>'}
     ${it.erroSync ? `<div class="tag err" style="display:block;padding:6px;margin-top:6px">${esc(it.erroSync)}</div>` : ''}</div></div>
   <div class="f"><label>Notas</label><textarea id="iNotas">${esc(it.notas)}</textarea></div>
-  <div class="acts">${novo ? '' : `<button class="btn dan l" data-acao="excluirItem">${it.vinculado ? 'Desvincular' : 'Excluir'}</button>`}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarItem">Salvar</button></div>`);
+  <div class="acts">${novo ? '' : `<button class="btn dan l" data-acao="excluirItem">${it.vinculado ? 'Desvincular' : 'Excluir'}</button>`}${!novo && !it.recorrencia && !it.leitura ? '<button class="btn" data-acao="itemParaDemanda" title="Tira da agenda e cria uma demanda do projeto">Transformar em demanda</button>' : ''}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarItem">Salvar</button></div>`);
   modalItem._id = it.id; modalItem._novo = novo;
   modalItem._rascunho = it;
   const upd = () => {
@@ -1531,7 +1531,7 @@ function modalEvento(e) {
       <div style="display:flex;gap:8px;margin-top:6px"><select id="eProj" style="flex:1;border:1px solid #cfd4de;border-radius:8px;padding:6px">${optsProjetos((projetoDoTexto(e.subject) || {}).p ? projetoDoTexto(e.subject).p.id : '')}</select>
       <button class="btn" data-acao="vincularEv" ${D.projetos.length ? '' : 'disabled'}>Vincular</button></div>
       <div class="hint" style="margin-top:4px">${e.seriesMasterId ? 'Vincula a série inteira. ' : ''}O evento continua na agenda; o projeto passa a acompanhá-lo.</div></div>
-    <div class="acts">${edit ? `<button class="btn dan l" data-acao="excluirEv">Excluir</button>` : ''}<button class="btn" data-acao="fechar">Fechar</button>${edit ? `<button class="btn pri" data-acao="salvarEv">Salvar</button>` : ''}</div>`);
+    <div class="acts">${edit ? `<button class="btn dan l" data-acao="excluirEv">Excluir</button><button class="btn" data-acao="evParaDemanda" title="Tira da agenda e cria uma demanda do projeto">Transformar em demanda</button>` : ''}<button class="btn" data-acao="fechar">Fechar</button>${edit ? `<button class="btn pri" data-acao="salvarEv">Salvar</button>` : ''}</div>`);
   modalEvento._e = e;
 }
 async function salvarEvento() {
@@ -1666,6 +1666,10 @@ document.addEventListener('click', async ev => {
     case 'atalhoNovo': return novoItem();
     case 'salvarFer': { const uf = vConfig._ufVer || D.config.ufPadrao || 'RJ', cf = cfgFer(); const ls = $('#cfgFerAj').value.split('\n').map(x => x.trim()).filter(Boolean); cf.extras[uf] = ls.filter(x => x[0] === '+').map(x => x.slice(1).trim()); cf.removidos[uf] = ls.filter(x => x[0] === '-').map(x => x.slice(1).trim()); cacheFer.clear(); salvar(); toast('Feriados salvos.'); return render(); }
     case 'salvarDemanda': return salvarDemanda();
+    case 'concluirDemanda': return salvarDemanda({ concluir: true });
+    case 'reabrirDemanda': return salvarDemanda({ concluir: false });
+    case 'evParaDemanda': { const e = modalEvento._e, r = projetoDoTexto(e.subject); return modalDemanda(null, r ? r.p.id : '', { titulo: r ? (tituloLimpo(e.subject, r.p) || e.subject) : e.subject, data: e.start.dateTime.slice(0, 10), origem: { e } }); }
+    case 'itemParaDemanda': { const it = D.itens.find(i => i.id === modalItem._id); if (!it) return; const p = projeto(it.projetoId), r = p ? { p } : projetoDoTexto(it.titulo); return modalDemanda(null, r ? r.p.id : '', { titulo: r ? (tituloLimpo(it.titulo, r.p) || it.titulo) : it.titulo, data: it.data, origem: { item: it } }); }
     case 'excluirDemanda': return excluirDemanda();
     case 'addReuniaoOnline': return adicionarReuniaoOnline();
     case 'editarSerie': return modalSerie(modalEvento._e);
@@ -2136,29 +2140,37 @@ function calPadraoProjeto(pid) {
   if (c) return c.padrao ? '@principal' : c.id;
   return D.config.ultimoCal || '@principal';
 }
-function modalDemanda(it, pid) {
-  const novo = !it;
+function modalDemanda(it, pid, pre) {
+  const novo = !it; pre = pre || {};
   if (!D.projetos.length) return toast('Crie um projeto primeiro, em Empresas e projetos.', true);
   const aviso = it && it.avisoId ? D.itens.find(i => i.id === it.avisoId) : null;
   const lemb = (it && it.lembrarEm) || '';
   const proj = (it && it.projetoId) || pid || '';
-  abrirModal(`<h3>${novo ? 'Nova demanda' : 'Demanda'}</h3>
+  const feito = it && it.concluidas[it.data];
+  abrirModal(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><h3 style="margin:0;flex:1">${pre.origem ? 'Transformar em demanda' : novo ? 'Nova demanda' : 'Demanda'}${feito ? ' <span class="tag ol">concluída</span>' : ''}</h3>${novo ? '' : '<button class="btn sm" data-acao="fechar" aria-label="Fechar">✕</button>'}</div>
+    ${pre.origem ? '<p class="hint" style="margin-top:-6px">Ao salvar, o evento sai da agenda e vira uma demanda do projeto.</p>' : ''}
     <div class="f"><label>Projeto / obra</label><div style="display:flex;gap:8px;align-items:center"><span class="sw" id="dCor" style="width:14px;height:14px;background:${proj && projeto(proj) ? corDemanda(projeto(proj)) : '#c9c2b5'}"></span><select id="dProj" style="flex:1">${proj ? '' : '<option value="">— escolha —</option>'}${optsProjetos(proj)}</select></div></div>
-    <div class="f"><label>O que precisa ser feito</label><textarea id="dTit" style="min-height:60px" placeholder="Ex.: Enviar cronograma revisado para o cliente">${esc(it ? it.titulo : '')}</textarea></div>
-    <div class="fr"><div class="f"><label>Entregar até</label><input type="date" id="dPrazo" value="${it ? it.data : ''}"></div>
+    <div class="f"><label>O que precisa ser feito</label><textarea id="dTit" style="min-height:60px" placeholder="Ex.: Enviar cronograma revisado para o cliente">${esc(it ? it.titulo : (pre.titulo || ''))}</textarea></div>
+    <div class="fr"><div class="f"><label>Entregar até</label><input type="date" id="dPrazo" value="${it ? it.data : (pre.data || '')}"></div>
       <div class="f"><label>Lembrar em (opcional)</label><div style="display:flex;gap:6px"><input type="date" id="dLembD" value="${lemb.slice(0, 10)}" style="flex:1"><input type="time" id="dLembH" value="${lemb.slice(11, 16) || '09:00'}" style="width:110px"></div></div></div>
     <div class="box"><label class="cb" style="margin:0"><input type="checkbox" id="dAviso" ${!it || aviso ? 'checked' : ''}> Avisar também pela agenda (celular)</label>
 
       <div class="hint" style="margin-top:4px">Cria um evento curto "⏰ Lembrete" na agenda da empresa, no dia e horário do lembrete, que notifica pelo app do Outlook ou do Google. O prazo em si não vai para a agenda.</div></div>
-    ${it ? `<label class="cb"><input type="checkbox" id="dFeito" ${it.concluidas[it.data] ? 'checked' : ''}> Concluída</label>` : ''}
-    <div class="acts">${novo ? '' : '<button class="btn dan l" data-acao="excluirDemanda">Excluir</button>'}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarDemanda">Salvar</button></div>`);
-  modalDemanda._it = it;
+    <div class="acts">${novo ? `<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarDemanda">Salvar</button>`
+      : `<button class="btn dan l" data-acao="excluirDemanda">Excluir</button>${feito ? '<button class="btn" data-acao="reabrirDemanda">Reabrir</button>' : '<button class="btn pri" data-acao="concluirDemanda">✓ Concluir</button>'}`}</div>`);
+  modalDemanda._it = it; modalDemanda._pre = pre;
+  if (!novo) {
+    // edição: salva sozinho a cada alteração
+    let t; const auto = () => { clearTimeout(t); t = setTimeout(() => salvarDemanda({ manter: true, silencioso: true }), 400); };
+    ['#dProj', '#dTit', '#dPrazo', '#dLembD', '#dLembH', '#dAviso'].forEach(sel => $(sel).addEventListener('change', auto));
+  }
   $('#dProj').addEventListener('change', () => { const q = projeto($('#dProj').value); $('#dCor').style.background = q ? corDemanda(q) : '#c9c2b5'; });
   const avisoVis = () => { const tem = !!$('#dLembD').value; $('#dAviso').closest('.box').style.display = tem ? '' : 'none'; };
   $('#dLembD').addEventListener('input', avisoVis); $('#dLembD').addEventListener('change', avisoVis); avisoVis();
   setTimeout(() => $('#dTit').focus(), 30);
 }
-async function salvarDemanda() {
+async function salvarDemanda(opts) {
+  opts = opts || {};
   const pid = $('#dProj').value, tit = $('#dTit').value.trim(), prazo = $('#dPrazo').value;
   if (!pid) return toast('Escolha o projeto.', true);
   if (!tit) return toast('Descreva o que precisa ser feito.', true);
@@ -2168,11 +2180,14 @@ async function salvarDemanda() {
   if (!it) { it = novoItemBase({ tipo: 'entrega', demanda: true }); D.itens.push(it); }
   const prazoAntigo = it.data;
   Object.assign(it, { titulo: tit, projetoId: pid, areaId: p.areaId, data: prazo, hora: '', recorrencia: null, lembrarEm, sincronizar: false, calendarioId: calPadraoProjeto(pid) });
-  if ($('#dFeito')) { delete it.concluidas[prazoAntigo]; if ($('#dFeito').checked) it.concluidas[prazo] = true; else delete it.concluidas[prazo]; }
+  if (prazoAntigo && prazoAntigo !== prazo && it.concluidas[prazoAntigo]) { delete it.concluidas[prazoAntigo]; it.concluidas[prazo] = true; }
+  if (opts.concluir === true) it.concluidas[prazo] = true;
+  if (opts.concluir === false) delete it.concluidas[prazo];
+  const origem = (modalDemanda._pre || {}).origem;
   // aviso na agenda
   let aviso = it.avisoId ? D.itens.find(i => i.id === it.avisoId) : null;
   const querAviso = $('#dAviso').checked && lembrarEm;
-  fecharModal();
+  if (!opts.manter) fecharModal();
   if (querAviso) {
     if (!aviso) { aviso = novoItemBase({ tipo: 'tarefa', avisoDe: it.id }); D.itens.push(aviso); it.avisoId = aviso.id; }
     Object.assign(aviso, { titulo: '⏰ Lembrete: ' + tit, projetoId: pid, areaId: p.areaId, data: lembrarEm.slice(0, 10), hora: lembrarEm.slice(11, 16), duracao: 15, lembrete: 0, sincronizar: true, calendarioId: ((calObj(calPadraoProjeto(pid)) || {}).podeEditar ? calPadraoProjeto(pid) : '@principal'), showAs: 'free', notas: `Prazo: ${fmtData(prazo)}`, _pend: true });
@@ -2182,7 +2197,16 @@ async function salvarDemanda() {
     aviso.sincronizar = false; await sincronizar(aviso);
     D.itens = D.itens.filter(i => i !== aviso); delete it.avisoId;
   }
-  salvar(); faixaEventos = ''; render(); toast('Demanda salva.');
+  // veio de um evento/item da agenda: tira da agenda
+  if (origem) {
+    try {
+      if (origem.e) { const e = origem.e, c = e._cal; if (c.fonte === 'google') await gapi('DELETE', gEv(c.id, e.rawId)); else await graph('DELETE', `${calPath(c.id)}/events/${e.id}`); }
+      if (origem.item) { const o = origem.item; if (o.outlook && !o.leitura) await apagarEventoDoItem(o.outlook); D.itens = D.itens.filter(i => i !== o); }
+    } catch (x) { toast('A demanda foi criada, mas não consegui tirar o evento da agenda: ' + x.message, true); }
+    modalDemanda._pre = {};
+  }
+  salvar(); faixaEventos = ''; render();
+  if (!opts.silencioso) toast(opts.concluir === true ? 'Demanda concluída.' : opts.concluir === false ? 'Demanda reaberta.' : origem ? 'Evento transformado em demanda.' : 'Demanda salva.');
 }
 async function excluirDemanda() {
   const it = modalDemanda._it; if (!it) return fecharModal();
