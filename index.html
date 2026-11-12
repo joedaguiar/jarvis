@@ -458,7 +458,14 @@ function corAgendaRN() {
   return (_corRN = dom || D.config.corRN || '#6b2fa3');
 }
 // reunião criada pelo sistema: mesmo tom mais claro das reuniões do Outlook
-function corItemAgenda(it) { const c = corItem(it); return it.tipo === 'reuniao' && !it.demanda ? clarear(c, estiloEv() === 'solido' ? 0.4 : 0.28) : c; }
+function empresaDoProjeto(p) { return p.categoria === 'pessoal' ? 'pessoal' : chaveEmpresa(p.areaId); }
+// só reuniões da R. Nunes ficam no tom claro (JF, SIGO e Pessoal mantêm a cor)
+function reuniaoRN(it) {
+  const p = it.projetoId && projeto(it.projetoId); if (p) return empresaDoProjeto(p) === 'rnunes';
+  const cal = calendarioDoItem(it); if (!cal || cal === '@principal') return true;
+  const c = calObj(cal); return !!c && (c.padrao || chaveFiltro(c.id) === chaveRN());
+}
+function corItemAgenda(it) { const c = corItem(it); return it.tipo === 'reuniao' && !it.demanda && reuniaoRN(it) ? clarear(c, estiloEv() === 'solido' ? 0.4 : 0.28) : c; }
 function corEmpresa(p) {
   const a = area(p.areaId);
   if (p.categoria === 'pessoal') return '#16a34a';
@@ -783,7 +790,9 @@ function corEvento(e, base, dono) {
   const nomesArea = new Set(D.areas.map(a => a.nome));
   if (e.categories && e.categories.length && categorias) { const c = e.categories.filter(n => !nomesArea.has(n)).map(n => categorias[n]).find(Boolean); if (c) cor = c; }
   else if (e.gColor && GCORES[e.gColor]) cor = GCORES[e.gColor];
-  if ((dono && dono.tipo === 'reuniao') || (e._cal.padrao && ehReuniao(e))) return clarear(cor, estiloEv() === 'solido' ? 0.4 : 0.28);
+  const empD = dono && dono.projetoId && projeto(dono.projetoId) ? empresaDoProjeto(projeto(dono.projetoId)) : '';
+  if (empD && empD !== 'rnunes') return cor;
+  if ((dono && dono.tipo === 'reuniao' && reuniaoRN(dono)) || (e._cal.padrao && ehReuniao(e))) return clarear(cor, estiloEv() === 'solido' ? 0.4 : 0.28);
   return cor;
 }
 const SHOWAS = { free: 'Livre', tentative: 'Provisório', busy: 'Ocupado', oof: 'Ausência temporária', workingElsewhere: 'Trabalhando em outro lugar' };
