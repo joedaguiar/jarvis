@@ -1478,7 +1478,7 @@ function vProjetos0() {
     det = `<div class="card"><div style="display:flex;align-items:center;gap:10px"><span class="sw" style="background:${a ? a.cor : '#999'};width:16px;height:16px"></span><div style="flex:1"><h2 style="margin:0;font-size:20px">${esc(p.nome)}</h2><div class="hint">${esc(a ? a.nome : '')} · ${p.tipo === 'obra' ? 'Obra' : 'Projeto'}${CATEGORIAS[p.categoria] ? ' · ' + CATEGORIAS[p.categoria].nome : ''}${p.local ? ' · ' + esc(p.local) : ''}</div></div><button class="btn sm pri" data-demanda-proj="${p.id}">+ Demanda</button> <button class="btn sm" data-editproj="${p.id}">Editar</button></div>
       ${p.descricao ? `<p style="margin:10px 0 0;white-space:pre-wrap">${esc(p.descricao)}</p>` : ''}</div>
       ${cardControle(p)}
-      ${(() => { const hs = ymd(hoje0()), l = eventos.filter(e => { const r = projetoDoTexto(e.subject); return r && r.p.id === p.id && e.end.dateTime.slice(0, 10) >= hs; }).sort((a, b) => a.start.dateTime.localeCompare(b.start.dateTime)).slice(0, 12);
+      ${(() => { const hs = ymd(hoje0()), l = eventos.filter(e => { const r = !evDoRodrigo(e) && projetoDoTexto(e.subject); return r && r.p.id === p.id && e.end.dateTime.slice(0, 10) >= hs; }).sort((a, b) => a.start.dateTime.localeCompare(b.start.dateTime)).slice(0, 12);
         return l.length ? `<div class="card"><div class="sec-h"><h3>Na agenda</h3><span class="hint">reconhecidos pelo nome · período carregado</span></div>${l.map(e => `<div class="row"><div class="bar" style="background:${tagProjeto(p).cor}"></div><div class="time">${fmtData(e.start.dateTime.slice(0, 10))}${e.isAllDay ? '' : ' ' + e.start.dateTime.slice(11, 16)}</div><div class="txt" data-ev="${esc(e.id)}"><div class="t">${esc(tituloLimpo(e.subject, p) || e.subject)}</div><div class="s">${esc(e._cal.nome)}</div></div></div>`).join('')}</div>` : ''; })()}
       ${secoesItens(D.itens.filter(i => i.projetoId === p.id), { areaId: p.areaId, projetoId: p.id })}`;
   }
@@ -1697,7 +1697,7 @@ function modalEvento(e) {
       : (edit ? `<p><button class="btn sm" data-acao="addReuniaoOnline">+ Adicionar link ${c.fonte === 'google' ? 'do Google Meet' : 'do Teams'}</button></p>` : '')}
     <p>${e.webLink ? `<a href="${esc(e.webLink)}" target="_blank">Abrir no ${c.fonte === 'google' ? 'Google Agenda' : 'Outlook'}</a>` : ''}</p>
     <div class="box"><label class="hint" style="font-weight:600">Vincular a um projeto</label>
-      <div style="display:flex;gap:8px;margin-top:6px"><select id="eProj" style="flex:1;border:1px solid #cfd4de;border-radius:8px;padding:6px">${optsProjetos((projetoDoTexto(e.subject) || {}).p ? projetoDoTexto(e.subject).p.id : '')}</select>
+      <div style="display:flex;gap:8px;margin-top:6px"><select id="eProj" style="flex:1;border:1px solid #cfd4de;border-radius:8px;padding:6px">${optsProjetos((!evDoRodrigo(e) && projetoDoTexto(e.subject) || {}).p ? projetoDoTexto(e.subject).p.id : '')}</select>
       <button class="btn" data-acao="vincularEv" ${D.projetos.length ? '' : 'disabled'}>Vincular</button></div>
       <div class="hint" style="margin-top:4px">${e.seriesMasterId ? 'Vincula a série inteira. ' : ''}O evento continua na agenda; o projeto passa a acompanhá-lo.</div></div>
     <div class="acts">${edit ? `<button class="btn dan l" data-acao="excluirEv">Excluir</button><button class="btn" data-acao="evParaDemanda" title="Tira da agenda e cria uma demanda do projeto">Transformar em demanda</button>` : ''}<button class="btn" data-acao="fechar">Fechar</button>${edit ? `<button class="btn pri" data-acao="salvarEv">Salvar</button>` : ''}</div>`);
@@ -2273,12 +2273,16 @@ function tituloLimpo(txt, p) {
   const low = out.toLocaleLowerCase('pt-BR');
   return low.charAt(0).toLocaleUpperCase('pt-BR') + low.slice(1);
 }
+// eventos das agendas do Rodrigo Nunes: título original, sem ligar a projeto
+function evDoRodrigo(e) { return !!(e && e._cal && chaveFiltro(e._cal.id) === chaveRN()); }
 function projetoDaEntrada(x) {
   if (x.k === 'item') {
+    if (x.ev && evDoRodrigo(x.ev) && x.it.vinculado) return null;
     const p = projeto(x.it.projetoId); if (p && p.categoria !== 'pessoal') return p;
+    if (x.ev && evDoRodrigo(x.ev)) return null;
     const r = projetoDoTexto((x.ev && x.ev.subject) || x.titulo); return r ? r.p : null;
   }
-  if (x.k === 'ev') { const r = projetoDoTexto(x.e.subject); return r ? r.p : null; }
+  if (x.k === 'ev') { if (evDoRodrigo(x.e)) return null; const r = projetoDoTexto(x.e.subject); return r ? r.p : null; }
   return null;
 }
 function partesEntrada(x) {
