@@ -802,13 +802,15 @@ function escurecer(hex, f) {
 }
 // eventos com fundo claro da cor da agenda + filete forte à esquerda: texto escuro e legível
 const estiloEv = () => (D && D.config.estiloEventos) || 'solido';
+const COR_AUSENTE = '#dc2626';
 function estiloSA(sa, cor) {
+  if (sa === 'oof') cor = COR_AUSENTE;
   if (estiloEv() === 'pastel') {
     // tons pastel: fundo claro e suave da cor da agenda, texto no tom escuro dela
     const bg = clarear(cor, .6), txt = escurecer(cor, .6);
     if (sa === 'tentative') return `background:repeating-linear-gradient(135deg,${bg} 0 6px,${clarear(cor, .82)} 6px 12px);color:${txt};`;
     if (sa === 'free') return `background:#fffdf9;border:1px solid ${clarear(cor, .45)};color:${txt};`;
-    if (sa === 'oof') return `background:${clarear('#7c5aa6', .62)};color:#3b2a57;`;
+    if (sa === 'oof') return `background:${clarear(cor, .62)};color:${escurecer(cor, .6)};`;
     if (sa === 'workingElsewhere') return `background:${bg};border:1px dashed ${clarear(cor, .3)};color:${txt};`;
     return `background:${bg};color:${txt};`;
   }
@@ -816,14 +818,14 @@ function estiloSA(sa, cor) {
     // cor forte com texto branco (estilo original)
     if (sa === 'tentative') return `background:repeating-linear-gradient(135deg,${cor} 0 6px,${clarear(cor, .4)} 6px 12px);color:#fff;text-shadow:0 0 3px rgba(0,0,0,.5);`;
     if (sa === 'free') return `background:#fff;border:1px solid ${cor};border-left:3px solid ${cor};color:${escurecer(cor, .45)};`;
-    if (sa === 'oof') return `background:${cor};box-shadow:inset 4px 0 0 #5c2e91;color:#fff;`;
+    if (sa === 'oof') return `background:${cor};color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.28);`;
     if (sa === 'workingElsewhere') return `background:${cor};border:1px dashed #fff;color:#fff;`;
     return `background:${cor};color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.28);`;
   }
   const fundo = clarear(cor, .8), txt = escurecer(cor, .55);
   if (sa === 'tentative') return `background:repeating-linear-gradient(135deg,${fundo} 0 6px,#fff 6px 11px);border-left:3px dashed ${cor};color:${txt};`;
   if (sa === 'free') return `background:#fff;border:1px solid ${clarear(cor, .4)};border-left:3px solid ${cor};color:${txt};`;
-  if (sa === 'oof') return `background:${clarear('#5c2e91', .82)};border-left:3px solid #5c2e91;color:#3b1d5e;`;
+  if (sa === 'oof') return `background:${clarear(cor, .82)};border-left:3px solid ${cor};color:${escurecer(cor, .55)};`;
   if (sa === 'workingElsewhere') return `background:${fundo};border:1px dotted ${cor};border-left:3px solid ${cor};color:${txt};`;
   return `background:${fundo};border-left:3px solid ${cor};color:${txt};`;
 }
@@ -1120,6 +1122,7 @@ function entradas(ini, fim) {
     }
   });
   out.sort((a, b) => a.data.localeCompare(b.data) || (a.hora || '').localeCompare(b.hora || '') || a.titulo.localeCompare(b.titulo));
+  out.forEach(x => { if (x.sa === 'oof') x.cor = COR_AUSENTE; }); // ausência temporária sempre em vermelho
   return out;
 }
 function subtitulo(x) {
@@ -1576,7 +1579,7 @@ function modalItem(it, novo) {
   const optsCal = (todosCals().some(k => k.padrao) ? '' : `<option value="@principal" ${!calAtual ? 'selected' : ''}>Outlook · Calendário principal</option>`) +
     editaveis.map(k => `<option value="${k.padrao ? '@principal' : esc(k.id)}" ${(k.padrao ? !calAtual : calAtual === k.id) ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}${k.podeEditar ? '' : ' (só leitura)'}</option>`).join('');
   const dsel = r.dias || [];
-  abrirModal(`<h3>${novo ? 'Novo agendamento' : 'Editar agendamento'}</h3>
+  abrirModal(`<h3>${it.origemDemanda ? 'Levar demanda para a agenda' : novo ? 'Novo agendamento' : 'Editar agendamento'}</h3>${it.origemDemanda ? '<p class="hint" style="margin-top:-6px">Ao salvar, a demanda sai da lista de demandas e vira este agendamento.</p>' : ''}
   <div class="fr"><div class="f" style="flex:2"><label>Título</label><input id="iTit" value="${esc(it.titulo)}" placeholder="Ex.: Relatório semanal de avanço"></div>
     <div class="f"><label>Tipo</label><select id="iTipo">${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}" ${k === it.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
   <div class="fr"><div class="f"><label>Agenda</label><div style="display:flex;gap:6px;align-items:center"><span class="sw" id="iCalSw" style="width:14px;height:14px;background:${corItem(it)}"></span><select id="iCal" style="flex:1">${optsCal}</select></div></div><div class="f"><label>Projeto / obra</label><select id="iProj">${optsProj}</select></div></div>
@@ -1668,6 +1671,13 @@ async function salvarItemModal() {
   it.areaId = areaDoItem(it);
   D.config.ultimoCal = it.calendarioId;
   if (novo) D.itens.push(it);
+  if (novo && it.origemDemanda) {
+    const dm = D.itens.find(i => i.id === it.origemDemanda), av = dm && dm.avisoId ? D.itens.find(i => i.id === dm.avisoId) : null;
+    delete it.origemDemanda;
+    if (av) { av.sincronizar = false; sincronizar(av).catch(() => { }); }
+    D.itens = D.itens.filter(i => i !== dm && i !== av);
+    if (dm) toast('Demanda levada para a agenda.');
+  }
   fecharModal(); salvar(); render();
   if (it.sincronizar || it.outlook) { await sincronizar(it); salvar(); faixaEventos = ''; render(); if (!it.erroSync) toast('Agenda atualizada.'); }
 }
@@ -1842,6 +1852,11 @@ document.addEventListener('click', async ev => {
     case 'evParaDemanda': { const e = modalEvento._e, r = projetoDoTexto(e.subject); return modalDemanda(null, r ? r.p.id : '', { titulo: r ? (tituloLimpo(e.subject, r.p) || e.subject) : e.subject, data: e.start.dateTime.slice(0, 10), origem: { e } }); }
     case 'itemParaDemanda': { const it = D.itens.find(i => i.id === modalItem._id); if (!it) return; const p = projeto(it.projetoId), r = p ? { p } : projetoDoTexto(it.titulo); return modalDemanda(null, r ? r.p.id : '', { titulo: r ? (tituloLimpo(it.titulo, r.p) || it.titulo) : it.titulo, data: it.data, origem: { item: it } }); }
     case 'excluirDemanda': return excluirDemanda();
+    case 'demandaParaAgenda': {
+      const d = modalDemanda._it; if (!d) return;
+      const p = projeto(d.projetoId), h = hoje0(), data = d.data && d.data >= ymd(h) ? d.data : ymd(h);
+      return novoItem({ tipo: 'tarefa', titulo: d.titulo, projetoId: d.projetoId || '', areaId: d.areaId || (p && p.areaId), data, hora: '09:00', duracao: 60, origemDemanda: d.id });
+    }
     case 'addReuniaoOnline': return adicionarReuniaoOnline();
     case 'editarSerie': return modalSerie(modalEvento._e);
     case 'salvarSerie': return salvarSerie();
@@ -2329,7 +2344,7 @@ function modalDemanda(it, pid, pre) {
 
       <div class="hint" style="margin-top:4px">Cria um evento curto "⏰ Lembrete" na agenda da empresa, no dia e horário do lembrete, que notifica pelo app do Outlook ou do Google. O prazo em si não vai para a agenda.</div></div>
     <div class="acts">${novo ? `<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarDemanda">Salvar</button>`
-      : `<button class="btn dan l" data-acao="excluirDemanda">Excluir</button><span class="hint" id="dSalvo" style="margin-right:auto;align-self:center">As alterações são salvas sozinhas.</span>${feito ? '<button class="btn" data-acao="reabrirDemanda">Reabrir</button>' : '<button class="btn ok" data-acao="concluirDemanda" title="Marca a demanda como feita">✓ Marcar como concluída</button>'}`}</div>`);
+      : `<button class="btn dan l" data-acao="excluirDemanda">Excluir</button><span class="hint" id="dSalvo" style="margin-right:auto;align-self:center">As alterações são salvas sozinhas.</span>${feito ? '' : '<button class="btn" data-acao="demandaParaAgenda" title="Tira das demandas e cria um agendamento na agenda">📅 Levar para a agenda</button>'}${feito ? '<button class="btn" data-acao="reabrirDemanda">Reabrir</button>' : '<button class="btn ok" data-acao="concluirDemanda" title="Marca a demanda como feita">✓ Marcar como concluída</button>'}`}</div>`);
   modalDemanda._it = it; modalDemanda._pre = pre;
   if (!novo) {
     // edição: salva sozinho a cada alteração
