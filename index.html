@@ -244,6 +244,9 @@ body.mini #outlookStatus .dot{margin:3px}
 .rnbtn.off{border-color:var(--line);background:#f1f1f1}
 .rnbtn.off svg{filter:grayscale(1);opacity:.35}
 .rnbtn.off .txt{color:#9ca3af;text-decoration:line-through}
+.wk .hd .hfx{display:flex;flex-direction:column;gap:2px;width:calc(100% - 8px);margin-top:5px}
+.wk .hd .hfx i{display:block;height:5px;border-radius:3px;cursor:pointer;transition:height .12s}
+.wk .hd .hfx i:hover{height:8px}
 .hdots .pd{width:10px;height:10px;flex:none;border-radius:50%;cursor:pointer;display:block}
 .hdots .pd.ok{opacity:.35}
 .hdots b{font-size:10px;color:var(--muted)}
@@ -1455,12 +1458,12 @@ function vCalendario() {
   const ent = entradas(ini, fim);
   let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent, '52px')};--px:${PX}px"><div class="hd"></div>`;
   for (let i = 0; i < 7; i++) {
-    const dd = addDays(ini, i), d = ymd(dd), dt = ent.filter(x => x.data === d && !x.hora);
+    const dd = addDays(ini, i), d = ymd(dd), sh = ent.filter(x => x.data === d && !x.hora), dt = sh.filter(x => x.k === 'item' && x.it.demanda), fx = sh.filter(x => !(x.k === 'item' && x.it.demanda));
     const ord = { rnunes: 0, jf: 1, sigo: 2, pessoal: 3 }, dots = l => l.map(x => { const p = projetoDaEntrada(x), cp = p ? tagProjeto(p).cor : x.cor; return `<i class="pd ${x.feito ? 'ok' : ''}" style="background:${cp};box-shadow:0 0 0 2px #fff,0 0 0 3.5px ${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc((p ? tagProjeto(p).nome + ' · ' : '') + x.titulo)}"></i>`; });
     const comE = dt.map(x => ({ x, e: empresaDaEntrada(x) })), esq = comE.filter(o => o.e === 'rnunes').map(o => o.x),
       dir = comE.filter(o => o.e !== 'rnunes').sort((a, b) => (ord[a.e] ?? 9) - (ord[b.e] ?? 9)).map(o => o.x);
     const bloco = (l, lado) => l.length ? `<span class="hdots ${lado}">${dots(l.slice(0, 4)).join('')}${l.length > 4 ? `<b>+${l.length - 4}</b>` : ''}</span>` : '';
-    g += `<div class="hd ${d === hs ? 'hoje' : ''}" data-hdia="${d}" title="Clique para criar uma demanda neste dia"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${bloco(esq, 'esq')}${bloco(dir, 'dir')}</div>`;
+    g += `<div class="hd ${d === hs ? 'hoje' : ''}" data-hdia="${d}" title="Clique para criar uma demanda neste dia"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${bloco(esq, 'esq')}${bloco(dir, 'dir')}${fx.length ? `<span class="hfx">${fx.map(x => `<i style="background:${x.cor}${x.feito ? ';opacity:.4' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc(x.titulo)} · dia todo"></i>`).join('')}</span>` : ''}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
