@@ -161,6 +161,8 @@ body.mini #outlookStatus .dot{margin:3px}
 .tfiltros #tfQ,.tfiltros select{border:1px solid var(--areia);border-radius:10px;padding:7px 10px;background:#fff}
 .tfiltros #tfQ{min-width:220px}
 .tfiltros .cb{white-space:nowrap}
+.calcor{display:inline-flex;align-items:center;gap:2px;vertical-align:middle;margin-right:4px}.calcor input{width:26px;height:20px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
+.calcor .lnk{border:0;background:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 2px}
 .corcat{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line-2)}.corcat:last-child{border-bottom:0}
 .corcat input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer}
 .corcat b{width:70px}.corcat .hint{flex:1}
@@ -708,7 +710,8 @@ async function _carregarCalendarios() {
   if (mudou) salvar();
 }
 function tzOff() { const m = -new Date().getTimezoneOffset(), a = Math.abs(m); return (m >= 0 ? '+' : '-') + pad(Math.floor(a / 60)) + ':' + pad(a % 60); }
-const corCal = (c, i) => c.cor || CORES[(i + 4) % CORES.length];
+// cor da agenda: a escolhida no sistema (Configurações) vale sobre a do Outlook/Google
+const corCal = (c, i) => ((D && D.config.coresCal) || {})[c.id] || c.cor || CORES[(i + 4) % CORES.length];
 let ultimaFaixa = null, atualizadoEm = null, carregando = 0, ultimaAssin = '';
 async function carregarEventos(ini, fim, forcar, silencioso) {
   if (!conectado() && !gOk() && !gCfg().ativo) return;
@@ -799,7 +802,8 @@ function corEvento(e, base, dono) {
   let cor = base;
   // categorias com o nome das empresas foram colocadas pelo próprio sistema antes: ignora
   const nomesArea = new Set(D.areas.map(a => a.nome));
-  if (e.categories && e.categories.length && categorias) { const c = e.categories.filter(n => !nomesArea.has(n)).map(n => categorias[n]).find(Boolean); if (c) cor = c; }
+  if (((D.config.coresCal || {})[e._cal.id])) { /* cor escolhida no sistema manda */ }
+  else if (e.categories && e.categories.length && categorias) { const c = e.categories.filter(n => !nomesArea.has(n)).map(n => categorias[n]).find(Boolean); if (c) cor = c; }
   else if (e.gColor && GCORES[e.gColor]) cor = GCORES[e.gColor];
   const empD = dono && dono.projetoId && projeto(dono.projetoId) ? empresaDoProjeto(projeto(dono.projetoId)) : '';
   if (empD && empD !== 'rnunes') return cor;
@@ -1528,7 +1532,7 @@ function vConfig() { return abasConfig() + vConfig0(); }
 function vConfig0() {
   const c = D.config;
   const listaCals = todosCals();
-  const cals = (conectado() || gOk()) ? (listaCals.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Grupo no filtro</b></td><td><b>Pode editar</b></td></tr>${listaCals.map((k, i) => `<tr><td><span class="sw" style="background:${corCal(k, i)}"></span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
+  const cals = (conectado() || gOk()) ? (listaCals.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Grupo no filtro</b></td><td><b>Pode editar</b></td></tr>${listaCals.map((k, i) => `<tr><td><span class="calcor"><input type="color" data-calcor="${esc(k.id)}" value="${/^#[0-9a-f]{6}$/i.test(corCal(k, i)) ? corCal(k, i) : '#64748b'}" title="Trocar a cor desta agenda (só no sistema)">${(c.coresCal || {})[k.id] ? `<button class="lnk" data-calcorreset="${esc(k.id)}" title="Voltar à cor original">↺</button>` : ''}</span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
       <td><input type="checkbox" data-calvis="${esc(k.id)}" ${(c.calendariosVisiveis || []).includes(k.id) ? 'checked' : ''}></td><td><input data-calgrupo="${esc(k.id)}" value="${esc((c.gruposCal || {})[k.id] || '')}" placeholder="—" style="width:130px;border:1px solid #cfd4de;border-radius:6px;padding:3px 6px"></td><td>${k.podeEditar ? 'Sim' : 'Só leitura'}</td></tr>`).join('')}</table>` : '<div class="empty">Carregando calendários…</div>') : '<div class="empty">Conecte o Outlook ou o Google para escolher os calendários.</div>';
   if (conectado() && !calendarios.length && !vConfig._tentou) vConfig._tentou = true, carregarCalendarios().then(render).catch(e => { erroOutlook = e.message; });
   if (gOk() && !calendariosG.length && !vConfig._tentouG) vConfig._tentouG = true, gCarregarCalendarios().then(render).catch(e => { erroGoogle = e.message; });
@@ -1554,7 +1558,7 @@ function vConfig0() {
       ${D.areas.map(a => `<div class="f"><label>${esc(a.nome)}: calendário vinculado</label><select data-areacal="${a.id}">${opcCal(a.calendarioId)}${listaCals.filter(k => !k.podeEditar).map(k => `<option value="${esc(k.id)}" ${a.calendarioId === k.id ? 'selected' : ''}>${esc(k.nome)} (só leitura)</option>`).join('')}</select></div>`).join('')}
       <p class="hint">Se uma empresa tiver um calendário vinculado (do Outlook ou do Google), os eventos desse calendário ganham a cor da empresa, e os itens dela são gravados lá (quando você tem permissão de edição).</p>
     </div></div><div>
-    <div class="card"><h3>Calendários exibidos</h3>${cals}<p class="hint">Agendas com o mesmo <b>grupo</b> aparecem como uma só no filtro do topo.</p></div>
+    <div class="card"><h3>Calendários exibidos</h3>${cals}<p class="hint">Clique na cor para trocar a cor da agenda aqui no sistema (no Outlook e no Google não muda). Agendas com o mesmo <b>grupo</b> aparecem como uma só no filtro do topo.</p></div>
     <div class="card"><h3>Cores das categorias</h3>
       <p class="hint" style="margin-top:-4px">Usadas nas demandas, nas bolinhas do dia e nos cartões de Tarefas.</p>
       ${CATS_COR.map(([k, n]) => { const own = (D.config.coresCategoria || {})[k], c = corCategoria(k); return `<div class="corcat"><input type="color" data-corcat="${k}" value="${/^#[0-9a-f]{6}$/i.test(c) ? c : '#64748b'}"><b>${n}</b><span class="hint">${own ? 'personalizada' : k === 'rnunes' ? 'padrão: roxo da agenda do Rodrigo Nunes' : 'padrão'}</span>${own ? `<button class="btn sm" data-corcatreset="${k}">Voltar ao padrão</button>` : ''}</div>`; }).join('')}</div>
@@ -1823,6 +1827,7 @@ document.addEventListener('click', async ev => {
   const eEl = t.closest('[data-ev]');
   if (eEl) { ev.stopPropagation(); const e = eventos.find(x => x.id === eEl.dataset.ev); if (e) modalEvento(e); return; }
   const hdd = t.closest('.wk .hd[data-hdia]'); if (hdd) return modalDemanda(null, '', { data: hdd.dataset.hdia });
+  const ccl = t.closest('[data-calcorreset]'); if (ccl) { const o = Object.assign({}, D.config.coresCal); delete o[ccl.dataset.calcorreset]; D.config.coresCal = o; salvar(); return render(); }
   const ccr = t.closest('[data-corcatreset]'); if (ccr) { const o = Object.assign({}, D.config.coresCategoria); delete o[ccr.dataset.corcatreset]; D.config.coresCategoria = o; salvar(); return render(); }
   const td = t.closest('.tadd[data-tdia]'); if (td) return modalDemanda(null, tFiltro.proj || '', { data: td.dataset.tdia });
   const nd = t.closest('[data-novo-data]'); if (nd) return novoItem({ data: nd.dataset.novoData });
@@ -1934,6 +1939,7 @@ document.addEventListener('change', ev => {
   if (t.id === 'tfProj') { tFiltro.proj = t.value; return render(); }
   if (t.id === 'tfCat') { tFiltro.cat = t.value; return render(); }
   if (t.id === 'tfRot') { tFiltro.rotinas = t.checked; return render(); }
+  if (t.dataset && t.dataset.calcor) { D.config.coresCal = Object.assign({}, D.config.coresCal, { [t.dataset.calcor]: t.value }); _corRN = undefined; salvar(); return render(); }
   if (t.dataset && t.dataset.corcat) { D.config.coresCategoria = Object.assign({}, D.config.coresCategoria, { [t.dataset.corcat]: t.value }); salvar(); return render(); }
   if (t.name === 'estEv') { D.config.estiloEventos = t.value; salvar(); return render(); }
   if (t.id === 'cfgUF') { D.config.ufPadrao = t.value; cacheFer.clear(); salvar(); return render(); }
