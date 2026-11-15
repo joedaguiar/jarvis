@@ -186,6 +186,8 @@ body.mini #outlookStatus .dot{margin:3px}
 .tsem .qcol.hoje{background:rgba(232,105,63,.07);box-shadow:inset 0 3px 0 var(--coral)}
 .tsem .qcol.hoje h3 .dw b{color:var(--coral)}
 .tsem .qcol.estreita{padding:10px 4px}.tsem .qcol.estreita h3{flex-direction:column;gap:2px;margin:2px 0 10px}.tsem .qcol.estreita h3 .dn{font-size:16px}.tsem .qcol.estreita h3 .dw{font-size:11px}
+.tsem .tcard[draggable]{cursor:grab}.tsem .tcard.arrastando{opacity:.35}
+.tsem .qcol.alvo{background:rgba(31,59,82,.06);box-shadow:inset 0 0 0 2px var(--salvia)}
 .tadd{margin-top:auto;border:1px dashed var(--line);background:transparent;border-radius:10px;padding:5px;color:var(--muted);cursor:pointer;font-size:15px;opacity:.6}
 .tadd:hover{opacity:1;background:var(--papel)}
 .quadro{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:12px;align-items:start;overflow-x:auto;padding-bottom:6px}
@@ -1379,7 +1381,8 @@ function vTarefas() {
     const p = projeto(pid(c)), cor = p ? corEmpresa(p) : c.k === 'ctl' ? corCtl(c.p) : corItem(c.it);
     const chk = c.k === 'ctl' ? `data-ctl="${c.p.id}|${c.pkey}|${c.tkey}"` : `data-conc="${c.it.id}|${c.chave}"`;
     const abrir = c.k === 'ctl' ? `data-selproj="${c.p.id}"` : `data-item="${c.it.id}"`;
-    return `<div class="tcard ${c.feito ? 'done' : ''}" style="--c:${cor}"><input type="checkbox" class="chk" ${chk} ${c.feito ? 'checked' : ''}>
+    const arr = c.k === 'ctl' ? `ctl|${c.p.id}|${c.pkey}|${c.tkey}` : `item|${c.it.id}|${c.chave}`;
+    return `<div class="tcard ${c.feito ? 'done' : ''}" style="--c:${cor}" draggable="true" data-arrasta="${esc(arr)}" title="Arraste para outro dia"><input type="checkbox" class="chk" ${chk} ${c.feito ? 'checked' : ''}>
       <div class="tb" ${abrir}><div class="tt">${esc(c.titulo)}</div><div class="ts">${p ? esc(p.nome) : (c.k === 'item' && c.it.recorrencia ? 'Rotina' : 'Sem projeto')}${c.data && (vista !== 'tarefas' || c.data < ymd(refSemana) || c.alerta) ? ' · ' + (c.alerta ? 'desde ' : '') + fmtData(c.data) : ''}</div>
       ${c.k === 'ctl' && c.acao === 'agendar' && !c.feito ? `<button class="btn sm pri" data-agendar="${c.p.id}|${c.pkey}" style="margin-top:6px">Agendar</button>` : ''}</div></div>`;
   };
@@ -2125,7 +2128,8 @@ function tarefasControle(p, ini, fim) {
   const out = [];
   const add = (pkey, tkey, titulo, data, extra) => {
     const r = ctlPeek(p.id, pkey);
-    out.push(Object.assign({ k: 'ctl', p, pkey, tkey, titulo, data: ymd(data), feito: !!r.feitos[tkey] }, extra || {}));
+    const mov = r.mover && r.mover[tkey];
+    out.push(Object.assign({ k: 'ctl', p, pkey, tkey, titulo, data: mov || ymd(data), dataRegra: ymd(data), movida: !!mov, feito: !!r.feitos[tkey] }, extra || {}));
   };
   if (cat.semanal) {
     for (let seg = segundaDe(addDays(ini, -6) > desde ? addDays(ini, -6) : desde); seg <= fim; seg = addDays(seg, 7)) {
@@ -2218,6 +2222,30 @@ function agendarFora(pid, pkey) {
   const r = ctlRec(pid, pkey); r.reuniaoData = d; r.reuniaoHora = $('#aHora').value; r.feitos.agendar = true;
   fecharModal(); salvar(); render(); toast('Data da reunião registrada.');
 }
+// arrastar cartões entre dias (aba Tarefas)
+function moverCartao(ref, novaData) {
+  const [k, a, b, c] = ref.split('|');
+  if (k === 'item') {
+    const it = D.itens.find(i => i.id === a); if (!it || it.data === novaData) return;
+    if (it.recorrencia) { toast('Itens que repetem não podem ser arrastados aqui.', true); return; }
+    if (it.concluidas[it.data]) { it.concluidas[novaData] = it.concluidas[it.data]; delete it.concluidas[it.data]; }
+    it.data = novaData;
+    toast('Prazo alterado para ' + fmtData(novaData) + '.');
+  } else {
+    const r = ctlRec(a, b), regra = (tarefasControle(projeto(a), addDays(parseYmd(novaData), -40), addDays(parseYmd(novaData), 40)).find(x => x.pkey === b && x.tkey === c) || {}).dataRegra;
+    r.mover = Object.assign({}, r.mover);
+    if (regra === novaData) delete r.mover[c]; else r.mover[c] = novaData;
+    toast('Tarefa movida para ' + fmtData(novaData) + '.');
+  }
+  salvar(); render();
+}
+(() => {
+  let arr = null;
+  document.addEventListener('dragstart', ev => { const c = ev.target.closest && ev.target.closest('.tsem [data-arrasta]'); if (!c) return; arr = c.dataset.arrasta; ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', arr); requestAnimationFrame(() => c.classList.add('arrastando')); });
+  document.addEventListener('dragend', () => { arr = null; $$('.arrastando').forEach(e => e.classList.remove('arrastando')); $$('.qcol.alvo').forEach(e => e.classList.remove('alvo')); });
+  document.addEventListener('dragover', ev => { if (!arr) return; const col = ev.target.closest && ev.target.closest('.tsem .qcol[data-tdia]'); if (!col) return; ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; $$('.qcol.alvo').forEach(e => e !== col && e.classList.remove('alvo')); col.classList.add('alvo'); });
+  document.addEventListener('drop', ev => { if (!arr) return; const col = ev.target.closest && ev.target.closest('.tsem .qcol[data-tdia]'); if (!col) return; ev.preventDefault(); const r = arr; arr = null; moverCartao(r, col.dataset.tdia); });
+})();
 function marcarCtl(pid, pkey, tkey, v) {
   const r = ctlRec(pid, pkey);
   if (v) r.feitos[tkey] = true; else delete r.feitos[tkey];
@@ -2499,7 +2527,7 @@ let swipe = null;
 const alvoSwipe = () => $('#view .wk, #view .mes, #view .semana, #view .tsem');
 document.addEventListener('pointerdown', ev => {
   if (!['tarefas', 'calendario'].includes(vista) || ev.button !== 0) return;
-  if (!ev.target.closest('#view') || ev.target.closest('.ev.movel, button, input, select, a, textarea, .cal-head')) return;
+  if (!ev.target.closest('#view') || ev.target.closest('.ev.movel, [data-arrasta], button, input, select, a, textarea, .cal-head')) return;
   swipe = { x: ev.clientX, y: ev.clientY, ativo: false };
 });
 document.addEventListener('pointermove', ev => {
