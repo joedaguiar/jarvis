@@ -2301,8 +2301,11 @@ function tituloLimpo(txt, p) {
   });
   out = out.replace(/[\s\-–—:|/·,]+$/g, '').replace(/^[\s\-–—:|/·,]+/g, '').replace(/\s{2,}/g, ' ').trim();
   if (!out) return '';
-  const low = out.toLocaleLowerCase('pt-BR');
-  return low.charAt(0).toLocaleUpperCase('pt-BR') + low.slice(1);
+  // respeita as maiúsculas digitadas; só ajusta texto todo em CAIXA ALTA (ex.: CRONOGRAMA → Cronograma), mantendo siglas curtas (RDO, PMO)
+  const tudoMaiusc = out === out.toLocaleUpperCase('pt-BR') && /[A-ZÀ-Ý]{2}/.test(out);
+  const SIGLAS = /^(RDO|PMO|BIM|ART|RRT|NF|OS|PDF|CAD|MEP|EAP|RH|JF|SIGO|DGO|DSM|EW|TI|ERP|CNPJ|CPF|INSS|FGTS)$/;
+  if (tudoMaiusc) out = out.split(' ').map(w => SIGLAS.test(semAcento(w).replace(/[^A-Z]/g, '')) ? w : w.toLocaleLowerCase('pt-BR')).join(' ');
+  return out.charAt(0).toLocaleUpperCase('pt-BR') + out.slice(1);
 }
 // eventos das agendas do Rodrigo Nunes: título original, sem ligar a projeto
 function evDoRodrigo(e) { return !!(e && e._cal && chaveFiltro(e._cal.id) === chaveRN()); }
