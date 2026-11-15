@@ -161,10 +161,20 @@ body.mini #outlookStatus .dot{margin:3px}
 .tfiltros #tfQ,.tfiltros select{border:1px solid var(--areia);border-radius:10px;padding:7px 10px;background:#fff}
 .tfiltros #tfQ{min-width:220px}
 .tfiltros .cb{white-space:nowrap}
-.calcor{display:inline-flex;align-items:center;gap:2px;vertical-align:middle;margin-right:4px}.calcor input{width:26px;height:20px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
-.calcor .lnk{border:0;background:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 2px}
-.corcat{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line-2)}.corcat:last-child{border-bottom:0}
-.corcat input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer}
+.swb{width:16px;height:16px;border-radius:50%;border:0;padding:0;background:var(--c);box-shadow:0 0 0 2px #fff,0 0 0 3px rgba(31,59,82,.14);cursor:pointer;vertical-align:middle;margin:0 8px 0 2px;transition:transform .12s,box-shadow .12s;flex:none}
+.swb:hover{transform:scale(1.15);box-shadow:0 0 0 2px #fff,0 0 0 3px var(--c)}
+#cpop{position:fixed;z-index:80;background:var(--papel);border-radius:16px;padding:12px;box-shadow:0 12px 32px rgba(31,59,82,.22),0 0 0 1px rgba(31,59,82,.06);animation:cpin .12s ease-out}
+@keyframes cpin{from{opacity:0;transform:translateY(-4px)}}
+.cp-g{display:grid;grid-template-columns:repeat(8,22px);gap:8px}
+.cp-g button{width:22px;height:22px;border-radius:50%;border:0;padding:0;background:var(--c);cursor:pointer;transition:transform .1s}
+.cp-g button:hover{transform:scale(1.15)}
+.cp-g button.on{box-shadow:0 0 0 2px var(--papel),0 0 0 4px var(--c)}
+.cp-f{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-2);font-size:12.5px}
+.cp-mais{display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--ink);font-weight:600;position:relative}
+.cp-mais input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.cp-mais span{width:18px;height:18px;border-radius:50%;background:conic-gradient(#ef4444,#f59e0b,#eab308,#22c55e,#06b6d4,#3b82f6,#a855f7,#ef4444)}
+.cp-reset{border:0;background:none;color:var(--muted);font:inherit;cursor:pointer;text-decoration:underline}
+.corcat{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line-2)}.corcat:last-child{border-bottom:0}
 .corcat b{width:70px}.corcat .hint{flex:1}
 .abas{display:flex;gap:4px;background:rgba(255,255,255,.45);border-radius:999px;padding:4px;width:max-content;margin-bottom:14px}
 .abas button{border:0;background:none;font:inherit;font-weight:600;font-size:13.5px;padding:7px 16px;border-radius:999px;cursor:pointer;color:var(--muted)}
@@ -474,6 +484,31 @@ function corItemAgenda(it) { const c = corItem(it); return it.tipo === 'reuniao'
 // cores por categoria (editáveis em Configurações → Cores das categorias)
 const CATS_COR = [['rnunes', 'R. Nunes'], ['jf', 'JF'], ['sigo', 'SIGO'], ['pessoal', 'Pessoal']];
 const COR_PADRAO_CAT = { jf: '#ea580c', sigo: '#2563eb', pessoal: '#eab308' };
+/* seletor de cor: bolinha + paleta flutuante */
+const PALETA = ['#6b2fa3', '#7c3aed', '#a78bfa', '#db2777', '#dc2626', '#ea580c', '#f59e0b', '#eab308', '#65a30d', '#16a34a', '#0d9488', '#0891b2', '#2563eb', '#1f3b52', '#475569', '#94a3b8'];
+const mapaCor = tipo => tipo === 'cal' ? 'coresCal' : 'coresCategoria';
+function botaoCor(tipo, chave, cor) { return `<button type="button" class="swb" data-cpick="${tipo}|${esc(chave)}" style="--c:${cor}" title="Trocar a cor"></button>`; }
+function definirCor(tipo, chave, val) {
+  const m = mapaCor(tipo), o = Object.assign({}, D.config[m]);
+  if (val) o[chave] = val; else delete o[chave];
+  D.config[m] = o; _corRN = undefined; salvar(); fecharPaleta(); render();
+}
+function fecharPaleta() { const el = $('#cpop'); if (el) el.remove(); }
+function abrirPaleta(btn) {
+  fecharPaleta();
+  const [tipo, chave] = btn.dataset.cpick.split('|'), atual = getComputedStyle(btn).getPropertyValue('--c').trim(), proprio = !!(D.config[mapaCor(tipo)] || {})[chave];
+  const pop = document.createElement('div'); pop.id = 'cpop';
+  pop.innerHTML = `<div class="cp-g">${PALETA.map(c => `<button type="button" style="--c:${c}" class="${c.toLowerCase() === atual.toLowerCase() ? 'on' : ''}" data-cset="${c}" title="${c}"></button>`).join('')}</div>
+    <div class="cp-f"><label class="cp-mais" title="Escolher outra cor"><input type="color" value="${/^#[0-9a-f]{6}$/i.test(atual) ? atual : '#64748b'}"><span></span>Outra cor</label>${proprio ? '<button type="button" class="cp-reset" data-creset>Original</button>' : ''}</div>`;
+  document.body.appendChild(pop);
+  const r = btn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left - 10)) + 'px';
+  pop.style.top = (r.bottom + h + 8 > innerHeight ? r.top - h - 8 : r.bottom + 8) + 'px';
+  pop.addEventListener('click', ev => { const b = ev.target.closest('[data-cset]'); if (b) definirCor(tipo, chave, b.dataset.cset); if (ev.target.closest('[data-creset]')) definirCor(tipo, chave, null); });
+  pop.querySelector('input').addEventListener('change', ev => definirCor(tipo, chave, ev.target.value));
+}
+document.addEventListener('mousedown', ev => { if (!ev.target.closest('#cpop, [data-cpick]')) fecharPaleta(); });
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-cpick]'); if (b) { ev.preventDefault(); ev.stopPropagation(); $('#cpop') && $('#cpop')._de === b.dataset.cpick ? fecharPaleta() : (abrirPaleta(b), $('#cpop')._de = b.dataset.cpick); } }, true);
 function corPadraoCategoria(k) {
   if (k === 'rnunes') return corAgendaRN();
   const a = k !== 'pessoal' && D.areas.find(a => chaveEmpresa(a.id) === k);
@@ -1532,7 +1567,7 @@ function vConfig() { return abasConfig() + vConfig0(); }
 function vConfig0() {
   const c = D.config;
   const listaCals = todosCals();
-  const cals = (conectado() || gOk()) ? (listaCals.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Grupo no filtro</b></td><td><b>Pode editar</b></td></tr>${listaCals.map((k, i) => `<tr><td><span class="calcor"><input type="color" data-calcor="${esc(k.id)}" value="${/^#[0-9a-f]{6}$/i.test(corCal(k, i)) ? corCal(k, i) : '#64748b'}" title="Trocar a cor desta agenda (só no sistema)">${(c.coresCal || {})[k.id] ? `<button class="lnk" data-calcorreset="${esc(k.id)}" title="Voltar à cor original">↺</button>` : ''}</span> ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
+  const cals = (conectado() || gOk()) ? (listaCals.length ? `<table class="cfg"><tr><td><b>Calendário</b></td><td><b>Mostrar</b></td><td><b>Grupo no filtro</b></td><td><b>Pode editar</b></td></tr>${listaCals.map((k, i) => `<tr><td>${botaoCor('cal', k.id, corCal(k, i))} ${esc(k.nome)} ${k.padrao ? '<span class="tag">principal</span>' : ''}<div class="hint">${esc([k.grupo, k.dono].filter(Boolean).join(' · '))}</div></td>
       <td><input type="checkbox" data-calvis="${esc(k.id)}" ${(c.calendariosVisiveis || []).includes(k.id) ? 'checked' : ''}></td><td><input data-calgrupo="${esc(k.id)}" value="${esc((c.gruposCal || {})[k.id] || '')}" placeholder="—" style="width:130px;border:1px solid #cfd4de;border-radius:6px;padding:3px 6px"></td><td>${k.podeEditar ? 'Sim' : 'Só leitura'}</td></tr>`).join('')}</table>` : '<div class="empty">Carregando calendários…</div>') : '<div class="empty">Conecte o Outlook ou o Google para escolher os calendários.</div>';
   if (conectado() && !calendarios.length && !vConfig._tentou) vConfig._tentou = true, carregarCalendarios().then(render).catch(e => { erroOutlook = e.message; });
   if (gOk() && !calendariosG.length && !vConfig._tentouG) vConfig._tentouG = true, gCarregarCalendarios().then(render).catch(e => { erroGoogle = e.message; });
@@ -1558,10 +1593,10 @@ function vConfig0() {
       ${D.areas.map(a => `<div class="f"><label>${esc(a.nome)}: calendário vinculado</label><select data-areacal="${a.id}">${opcCal(a.calendarioId)}${listaCals.filter(k => !k.podeEditar).map(k => `<option value="${esc(k.id)}" ${a.calendarioId === k.id ? 'selected' : ''}>${esc(k.nome)} (só leitura)</option>`).join('')}</select></div>`).join('')}
       <p class="hint">Se uma empresa tiver um calendário vinculado (do Outlook ou do Google), os eventos desse calendário ganham a cor da empresa, e os itens dela são gravados lá (quando você tem permissão de edição).</p>
     </div></div><div>
-    <div class="card"><h3>Calendários exibidos</h3>${cals}<p class="hint">Clique na cor para trocar a cor da agenda aqui no sistema (no Outlook e no Google não muda). Agendas com o mesmo <b>grupo</b> aparecem como uma só no filtro do topo.</p></div>
+    <div class="card"><h3>Calendários exibidos</h3>${cals}<p class="hint">Clique na bolinha para trocar a cor da agenda aqui no sistema (no Outlook e no Google não muda). Agendas com o mesmo <b>grupo</b> aparecem como uma só no filtro do topo.</p></div>
     <div class="card"><h3>Cores das categorias</h3>
       <p class="hint" style="margin-top:-4px">Usadas nas demandas, nas bolinhas do dia e nos cartões de Tarefas.</p>
-      ${CATS_COR.map(([k, n]) => { const own = (D.config.coresCategoria || {})[k], c = corCategoria(k); return `<div class="corcat"><input type="color" data-corcat="${k}" value="${/^#[0-9a-f]{6}$/i.test(c) ? c : '#64748b'}"><b>${n}</b><span class="hint">${own ? 'personalizada' : k === 'rnunes' ? 'padrão: roxo da agenda do Rodrigo Nunes' : 'padrão'}</span>${own ? `<button class="btn sm" data-corcatreset="${k}">Voltar ao padrão</button>` : ''}</div>`; }).join('')}</div>
+      ${CATS_COR.map(([k, n]) => { const own = (D.config.coresCategoria || {})[k], c = corCategoria(k); return `<div class="corcat">${botaoCor('cat', k, c)}<b>${n}</b><span class="hint">${own ? 'personalizada' : k === 'rnunes' ? 'padrão: roxo da agenda do Rodrigo Nunes' : 'padrão'}</span></div>`; }).join('')}</div>
     <div class="card"><h3>Aparência dos eventos</h3>
       <label class="cb"><input type="radio" name="estEv" value="pastel" ${estiloEv() === 'pastel' ? 'checked' : ''}> Tons pastel (eventos claros)</label>
       <label class="cb"><input type="radio" name="estEv" value="solido" ${estiloEv() === 'solido' ? 'checked' : ''}> Cor forte, texto branco</label>
@@ -1827,8 +1862,6 @@ document.addEventListener('click', async ev => {
   const eEl = t.closest('[data-ev]');
   if (eEl) { ev.stopPropagation(); const e = eventos.find(x => x.id === eEl.dataset.ev); if (e) modalEvento(e); return; }
   const hdd = t.closest('.wk .hd[data-hdia]'); if (hdd) return modalDemanda(null, '', { data: hdd.dataset.hdia });
-  const ccl = t.closest('[data-calcorreset]'); if (ccl) { const o = Object.assign({}, D.config.coresCal); delete o[ccl.dataset.calcorreset]; D.config.coresCal = o; salvar(); return render(); }
-  const ccr = t.closest('[data-corcatreset]'); if (ccr) { const o = Object.assign({}, D.config.coresCategoria); delete o[ccr.dataset.corcatreset]; D.config.coresCategoria = o; salvar(); return render(); }
   const td = t.closest('.tadd[data-tdia]'); if (td) return modalDemanda(null, tFiltro.proj || '', { data: td.dataset.tdia });
   const nd = t.closest('[data-novo-data]'); if (nd) return novoItem({ data: nd.dataset.novoData });
   const nt = t.closest('[data-novo-tipo]'); if (nt) return novoItem(Object.assign({ tipo: nt.dataset.novoTipo }, JSON.parse(nt.dataset.ctx)));
@@ -1939,8 +1972,6 @@ document.addEventListener('change', ev => {
   if (t.id === 'tfProj') { tFiltro.proj = t.value; return render(); }
   if (t.id === 'tfCat') { tFiltro.cat = t.value; return render(); }
   if (t.id === 'tfRot') { tFiltro.rotinas = t.checked; return render(); }
-  if (t.dataset && t.dataset.calcor) { D.config.coresCal = Object.assign({}, D.config.coresCal, { [t.dataset.calcor]: t.value }); _corRN = undefined; salvar(); return render(); }
-  if (t.dataset && t.dataset.corcat) { D.config.coresCategoria = Object.assign({}, D.config.coresCategoria, { [t.dataset.corcat]: t.value }); salvar(); return render(); }
   if (t.name === 'estEv') { D.config.estiloEventos = t.value; salvar(); return render(); }
   if (t.id === 'cfgUF') { D.config.ufPadrao = t.value; cacheFer.clear(); salvar(); return render(); }
   if (t.id === 'cfgUFver') { vConfig._ufVer = t.value; return render(); }
