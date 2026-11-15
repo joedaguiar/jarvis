@@ -244,9 +244,14 @@ body.mini #outlookStatus .dot{margin:3px}
 .rnbtn.off{border-color:var(--line);background:#f1f1f1}
 .rnbtn.off svg{filter:grayscale(1);opacity:.35}
 .rnbtn.off .txt{color:#9ca3af;text-decoration:line-through}
-.wk .hd .hfx{display:flex;flex-direction:column;gap:2px;width:calc(100% - 8px);margin-top:5px}
-.wk .hd .hfx i{display:block;height:5px;border-radius:3px;cursor:pointer;transition:height .12s}
-.wk .hd .hfx i:hover{height:8px}
+.wk .hd{padding-bottom:9px}
+.wk .hd .hfx{position:absolute;left:4px;right:4px;bottom:2px;display:flex;gap:3px;height:4px}
+.wk .hd .hfx i{flex:1;display:block;height:4px;border-radius:3px;cursor:pointer;align-self:flex-end;transition:height .12s}
+.wk .hd .hfx i:hover{height:6px}
+.wk .hd.fer{background:#fbeef1}
+.wk .hd.fer .dw,.wk .hd.fer .dn{color:#be185d}
+.wk .hd.fer.hoje .dn{color:#fff}
+.wk .col.fer{background:repeating-linear-gradient(#fcf3f5 0 calc(var(--px,48px) - 1px),#f1e4e8 calc(var(--px,48px) - 1px) var(--px,48px))}
 .hdots .pd{width:10px;height:10px;flex:none;border-radius:50%;cursor:pointer;display:block}
 .hdots .pd.ok{opacity:.35}
 .hdots b{font-size:10px;color:var(--muted)}
@@ -1458,18 +1463,18 @@ function vCalendario() {
   const ent = entradas(ini, fim);
   let g = `<div class="wk" style="--cols:${colunasSemana(ini, ent, '52px')};--px:${PX}px"><div class="hd"></div>`;
   for (let i = 0; i < 7; i++) {
-    const dd = addDays(ini, i), d = ymd(dd), sh = ent.filter(x => x.data === d && !x.hora), dt = sh.filter(x => x.k === 'item' && x.it.demanda), fx = sh.filter(x => !(x.k === 'item' && x.it.demanda));
+    const dd = addDays(ini, i), d = ymd(dd), sh = ent.filter(x => x.data === d && !x.hora), dt = sh.filter(x => x.k === 'item' && x.it.demanda), fer = feriadoDoDia(d, sh), fx = sh.filter(x => !(x.k === 'item' && x.it.demanda) && !ehEventoFeriado(x, d));
     const ord = { rnunes: 0, jf: 1, sigo: 2, pessoal: 3 }, dots = l => l.map(x => { const p = projetoDaEntrada(x), cp = p ? tagProjeto(p).cor : x.cor; return `<i class="pd ${x.feito ? 'ok' : ''}" style="background:${cp};box-shadow:0 0 0 2px #fff,0 0 0 3.5px ${x.cor}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc((p ? tagProjeto(p).nome + ' · ' : '') + x.titulo)}"></i>`; });
     const comE = dt.map(x => ({ x, e: empresaDaEntrada(x) })), esq = comE.filter(o => o.e === 'rnunes').map(o => o.x),
       dir = comE.filter(o => o.e !== 'rnunes').sort((a, b) => (ord[a.e] ?? 9) - (ord[b.e] ?? 9)).map(o => o.x);
     const bloco = (l, lado) => l.length ? `<span class="hdots ${lado}">${dots(l.slice(0, 4)).join('')}${l.length > 4 ? `<b>+${l.length - 4}</b>` : ''}</span>` : '';
-    g += `<div class="hd ${d === hs ? 'hoje' : ''}" data-hdia="${d}" title="Clique para criar uma demanda neste dia"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${bloco(esq, 'esq')}${bloco(dir, 'dir')}${fx.length ? `<span class="hfx">${fx.map(x => `<i style="background:${x.cor}${x.feito ? ';opacity:.4' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc(x.titulo)} · dia todo"></i>`).join('')}</span>` : ''}</div>`;
+    g += `<div class="hd ${d === hs ? 'hoje' : ''} ${fer ? 'fer' : ''}" data-hdia="${d}" title="${fer ? esc('Feriado: ' + fer) + '&#10;' : ''}Clique para criar uma demanda neste dia"><span class="dw">${DIAS[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>${bloco(esq, 'esq')}${bloco(dir, 'dir')}${fx.length ? `<span class="hfx">${fx.map(x => `<i style="background:${x.cor}${x.feito ? ';opacity:.4' : ''}" ${x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`} title="${esc(x.titulo)} · dia todo"></i>`).join('')}</span>` : ''}</div>`;
   }
   g += `<div class="hrs">${Array.from({ length: H1 - H0 }, (_, i) => `<div class="hr">${pad(H0 + i)}:00</div>`).join('')}</div>`;
   for (let i = 0; i < 7; i++) {
     const d = ymd(addDays(ini, i));
     const evs = layout(ent.filter(x => x.data === d && x.hora && hm2min(x.hora) < H1 * 60 && Math.max(hm2min(x.fim || x.hora), hm2min(x.hora) + 20) > H0 * 60));
-    g += `<div class="col ${d === hs ? 'hoje' : ''}" data-coldia="${d}" style="height:${(H1 - H0) * PX}px">${evs.map(x => {
+    g += `<div class="col ${d === hs ? 'hoje' : ''} ${feriadoDoDia(d, ent.filter(x => x.data === d && !x.hora)) ? 'fer' : ''}" data-coldia="${d}" style="height:${(H1 - H0) * PX}px">${evs.map(x => {
       const s = Math.min(Math.max(hm2min(x.hora), H0 * 60), H1 * 60 - 20), e = Math.max(Math.min(hm2min(x.fim || x.hora) || s + 30, H1 * 60), s + 20);
       const top = (s - H0 * 60) / 60 * PX, h = (e - s) / 60 * PX - 2;
       const movel = x.k === 'item' ? !x.it.leitura : (x.e._cal.podeEditar && !x.e.isAllDay);
@@ -2376,6 +2381,20 @@ function tituloLimpo(txt, p) {
   return out.charAt(0).toLocaleUpperCase('pt-BR') + out.slice(1);
 }
 // eventos das agendas do Rodrigo Nunes: título original, sem ligar a projeto
+// feriados: pela lista do sistema (estado padrão) e por eventos de dia todo das agendas de feriados
+function ehEventoFeriado(x, d) {
+  if (x.k !== 'ev') return false;
+  const c = x.e._cal || {};
+  if (/feriado|holiday/i.test(c.nome || '')) return true;
+  const f = listaFeriados(+d.slice(0, 4), D.config.ufPadrao || 'RJ', []).get(d);
+  return !!f && normTxt(x.titulo).includes(normTxt(f.replace(/\s*\(.*\)$/, '')).trim());
+}
+function feriadoDoDia(d, sh) {
+  const n = new Set(), f = listaFeriados(+d.slice(0, 4), D.config.ufPadrao || 'RJ', []).get(d);
+  if (f) n.add(f);
+  (sh || []).forEach(x => { if (ehEventoFeriado(x, d) && !f) n.add(x.titulo); });
+  return [...n].join(' · ');
+}
 function evDoRodrigo(e) { return !!(e && e._cal && chaveFiltro(e._cal.id) === chaveRN()); }
 function projetoDaEntrada(x) {
   if (x.k === 'item') {
