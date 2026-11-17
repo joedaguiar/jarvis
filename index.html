@@ -176,6 +176,36 @@ body.mini #outlookStatus .dot{margin:3px}
 .cp-reset{border:0;background:none;color:var(--muted);font:inherit;cursor:pointer;text-decoration:underline}
 .corcat{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line-2)}.corcat:last-child{border-bottom:0}
 .corcat b{width:70px}.corcat .hint{flex:1}
+.ppick{position:relative;display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:40px;padding:5px 8px;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:text}
+.ppick:focus-within{border-color:var(--salvia);box-shadow:0 0 0 3px rgba(31,59,82,.08)}
+.pp-chips{display:contents}
+.pp-chip{display:inline-flex;align-items:center;gap:6px;background:var(--areia);border-radius:999px;padding:3px 4px 3px 9px;font-size:12.5px;font-weight:600;max-width:100%}
+.pp-chip i{width:8px;height:8px;border-radius:50%;flex:none}
+.pp-chip button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:15px;line-height:1;padding:0 4px;border-radius:50%}
+.pp-chip button:hover{background:#fff;color:var(--ink)}
+.ppick .pp-in{flex:1;min-width:140px;border:0!important;outline:0;box-shadow:none!important;padding:4px 2px!important;background:none;font:inherit}
+.pp-sug{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--papel);border-radius:14px;box-shadow:0 12px 28px rgba(31,59,82,.2);max-height:240px;overflow:auto}
+.pp-sug:empty{display:none}
+.pp-sug .pp-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 12px 3px;font-weight:700}
+.pp-sug button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;text-align:left;padding:7px 12px;cursor:pointer;font:inherit;font-size:13px}
+.pp-sug button:hover{background:var(--areia)}
+.pp-sug button i{width:8px;height:8px;border-radius:50%;flex:none}
+.pp-sug button span{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp-sug button.novo{color:var(--salvia-esc)}
+.ct-wrap input,.ct-wrap select{border:1px solid var(--areia);border-radius:10px;padding:7px 10px;background:#fff;min-width:0;width:100%;box-sizing:border-box}
+.ct-wrap input:focus,.ct-wrap select:focus{border-color:var(--salvia);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.ct-novo .btn{white-space:nowrap}
+.ct-s select{padding:5px 6px;font-size:12.5px}
+.ct-wrap{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(260px,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.ct-wrap{grid-template-columns:1fr}}
+.ct-novo,.ct-r{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,1.2fr) 104px auto;gap:6px;align-items:center}
+.ct-novo{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line-2)}
+.ct-r{padding:2px 0}.ct-r input,.ct-r select{border-color:transparent;background:transparent}.ct-r input:hover,.ct-r select:hover,.ct-r input:focus{border-color:var(--line);background:#fff}
+.ct-r .lnk{border:0;background:none;color:var(--muted);cursor:pointer;padding:4px 8px;border-radius:8px}.ct-r .lnk:hover{color:var(--warn);background:#fff}
+.ct-g h4{display:flex;align-items:center;gap:8px;margin:14px 0 4px;font-size:12.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.ct-g h4 i{width:10px;height:10px;border-radius:50%}.ct-g h4 span{font-weight:500}
+.ct-s{display:grid;grid-template-columns:1fr 96px auto;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line-2);font-size:13px}.ct-s:last-child{border-bottom:0}
+@media (max-width:700px){.ct-novo,.ct-r{grid-template-columns:1fr 1fr}.ct-r .lnk{justify-self:end}}
 .abas{display:flex;gap:4px;background:rgba(255,255,255,.45);border-radius:999px;padding:4px;width:max-content;margin-bottom:14px}
 .abas button{border:0;background:none;font:inherit;font-weight:600;font-size:13.5px;padding:7px 16px;border-radius:999px;cursor:pointer;color:var(--muted)}
 .abas button.on{background:var(--papel);color:var(--ink);box-shadow:var(--sombra)}
@@ -918,7 +948,7 @@ function payloadEvento(it) {
   const p = projeto(it.projetoId), a = area(it.areaId);
   const ev = {
     subject: tituloAgenda(it),
-    body: { contentType: 'text', content: (it.notas ? it.notas + '\n\n' : '') + `[Meus Afazeres] ${a ? a.nome : ''}${p ? ' / ' + p.nome : ''}` },
+    body: { contentType: 'text', content: it.notas || '' },
     categories: [],
     isReminderOn: +it.lembrete >= 0,
     reminderMinutesBeforeStart: Math.max(0, +it.lembrete || 0),
@@ -945,8 +975,8 @@ function payloadEvento(it) {
     return min;
   }
   if (it.tipo === 'reuniao') {
-    ev.attendees = (it.participantes || '').split(/[,;\s]+/).filter(x => x.includes('@')).map(x => ({ emailAddress: { address: x }, type: 'required' }));
-    if (it.teams) { ev.isOnlineMeeting = true; ev.onlineMeetingProvider = 'teamsForBusiness'; }
+    ev.attendees = emailsDe(it.participantes).map(x => ({ emailAddress: { address: x, name: (contatoPorEmail(x) || {}).nome || x }, type: 'required' }));
+    if (it.teams && !it.linkReuniao) { ev.isOnlineMeeting = true; ev.onlineMeetingProvider = 'teamsForBusiness'; }
   }
   return ev;
 }
@@ -974,14 +1004,22 @@ async function sincronizar(it) {
       let r;
       if (it.outlook) r = await gapi('PATCH', gEv(cal, it.outlook.eventId) + conv, body);
       else { r = await gapi('POST', `/calendars/${encodeURIComponent(cal.slice(2))}/events${conv}`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
-      if (r && r.hangoutLink) it.linkReuniao = r.hangoutLink;
-      else if (body.conferenceData) { await espera(1500); const r2 = await gapi('GET', gEv(cal, it.outlook.eventId)).catch(() => null); if (r2 && r2.hangoutLink) it.linkReuniao = r2.hangoutLink; }
+      const linkG = x => x && (x.hangoutLink || ((x.conferenceData && x.conferenceData.entryPoints || []).find(e => e.entryPointType === 'video') || {}).uri);
+      if (linkG(r)) it.linkReuniao = linkG(r);
+      else if (body.conferenceData) {
+        for (const w of [1500, 3000, 5000]) { await espera(w); const r2 = await gapi('GET', gEv(cal, it.outlook.eventId) + '?conferenceDataVersion=1').catch(() => null); if (linkG(r2)) { it.linkReuniao = linkG(r2); break; } if (r2 && r2.conferenceData && r2.conferenceData.createRequest && r2.conferenceData.createRequest.status && r2.conferenceData.createRequest.status.statusCode === 'failure') break; }
+        if (!it.linkReuniao) toast('Google: a reunião foi criada, mas o Google não gerou o link do Meet nesta agenda.', true);
+      }
     } else {
       const body = payloadEvento(it);
       let r;
       if (it.outlook) r = await graph('PATCH', `${calPath(cal)}/events/${it.outlook.eventId}`, body);
       else { r = await graph('POST', `${calPath(cal)}/events`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
       if (r && r.onlineMeeting && r.onlineMeeting.joinUrl) it.linkReuniao = r.onlineMeeting.joinUrl;
+      else if (body.isOnlineMeeting) {
+        for (const w of [1500, 3000, 5000]) { await espera(w); const r2 = await graph('GET', `${calPath(cal)}/events/${it.outlook.eventId}?$select=onlineMeeting,isOnlineMeeting`).catch(() => null); if (r2 && r2.onlineMeeting && r2.onlineMeeting.joinUrl) { it.linkReuniao = r2.onlineMeeting.joinUrl; break; } }
+        if (!it.linkReuniao) toast('Outlook: a reunião foi criada, mas o Teams não gerou o link nesta agenda (agendas compartilhadas de outras pessoas podem não permitir). Use a sua agenda principal.', true);
+      }
     }
     it.erroSync = ''; delete it._pend;
     if (it.vinculado) { it.recImport = JSON.stringify(it.recorrencia); it.showAsImport = it.showAs || 'busy'; }
@@ -1083,7 +1121,7 @@ function payloadGoogle(it) {
   const ini = primeiraOcorrencia(it) || ymd(hoje0()), p = projeto(it.projetoId), a = area(it.areaId);
   const ev = {
     summary: tituloAgenda(it),
-    description: (it.notas ? it.notas + '\n\n' : '') + `[Meus Afazeres] ${a ? a.nome : ''}${p ? ' / ' + p.nome : ''}`,
+    description: it.notas || '',
     location: it.local || '',
     reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: Math.max(0, +it.lembrete || 0) }] },
     transparency: it.showAs === 'free' ? 'transparent' : 'opaque'
@@ -1100,7 +1138,7 @@ function payloadGoogle(it) {
     return min;
   }
   if (it.tipo === 'reuniao') {
-    ev.attendees = (it.participantes || '').split(/[,;\s]+/).filter(x => x.includes('@')).map(email => ({ email }));
+    ev.attendees = emailsDe(it.participantes).map(email => ({ email, displayName: (contatoPorEmail(email) || {}).nome || undefined }));
     if (it.teams && !it.linkReuniao) ev.conferenceData = { createRequest: { requestId: it.id + '-' + Date.now(), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
   }
   return ev;
@@ -1212,17 +1250,17 @@ function linha(x, opts = {}) {
 
 /* ================= views ================= */
 let vista = 'calendario', refSemana = domingo(hoje0()), refCal = hoje0(), modoCal = 'semana', selProj = null;
-const TITULOS = { painel: 'Painel', tarefas: 'Tarefas', hoje: 'Painel', semana: 'Semana', calendario: 'Calendário', projetos: 'Configurações', config: 'Configurações' };
+const TITULOS = { painel: 'Painel', tarefas: 'Tarefas', hoje: 'Painel', semana: 'Semana', calendario: 'Calendário', projetos: 'Configurações', contatos: 'Configurações', config: 'Configurações' };
 function irPara(v) { vista = v; render(); }
 function render() {
   if (drag && drag.ativo) return;
   _corRN = undefined;
   if (vista === 'semana') vista = 'tarefas';
-  $$('#nav button, #nav2 button').forEach(b => b.classList.toggle('on', b.dataset.v === vista || (b.dataset.v === 'config' && vista === 'projetos')));
+  $$('#nav button, #nav2 button').forEach(b => b.classList.toggle('on', b.dataset.v === vista || (b.dataset.v === 'config' && (vista === 'projetos' || vista === 'contatos'))));
   $('#titulo').textContent = TITULOS[vista];
   renderFiltros(); renderStatus();
   if (vista === 'hoje') vista = 'painel';
-  const f = { painel: vPainel, tarefas: vTarefas, semana: vSemana, calendario: vCalendario, projetos: vProjetos, config: vConfig }[vista];
+  const f = { painel: vPainel, tarefas: vTarefas, semana: vSemana, calendario: vCalendario, projetos: vProjetos, contatos: vContatos, config: vConfig }[vista];
   const sc = $('#view').scrollTop;
   $('#view').innerHTML = f();
   if (vista === 'calendario' && modoCal === 'semana') posicionarCalendario();
@@ -1510,7 +1548,93 @@ function posicionarCalendario() {
   if (nl) { const m = n.getHours() * 60 + n.getMinutes(); nl.style.display = m < H0 * 60 || m > H1 * 60 ? 'none' : ''; nl.style.top = ((m - H0 * 60) / 60 * PX) + 'px'; }
 }
 
-function abasConfig() { return `<div class="abas"><button class="${vista === 'config' ? 'on' : ''}" data-v="config">Geral</button><button class="${vista === 'projetos' ? 'on' : ''}" data-v="projetos">Empresas e projetos</button></div>`; }
+function abasConfig() { return `<div class="abas"><button class="${vista === 'config' ? 'on' : ''}" data-v="config">Geral</button><button class="${vista === 'projetos' ? 'on' : ''}" data-v="projetos">Empresas e projetos</button><button class="${vista === 'contatos' ? 'on' : ''}" data-v="contatos">Contatos</button></div>`; }
+/* ================= Contatos ================= */
+const EMPRESAS_CT = [['rnunes', 'R. Nunes'], ['jf', 'JF'], ['sigo', 'SIGO'], ['pessoal', 'Pessoal'], ['', 'Outros']];
+const contatos = () => (D.contatos = D.contatos || []);
+const normEmail = x => String(x || '').trim().toLowerCase();
+function emailsDe(txt) { return [...new Set((String(txt || '').match(/[^\s,;<>"']+@[^\s,;<>"']+\.[^\s,;<>"']+/g) || []).map(normEmail))]; }
+function contatoPorEmail(e) { e = normEmail(e); return contatos().find(c => normEmail(c.email) === e); }
+function empresaPorEmail(e) {
+  const dom = normEmail(e).split('@')[1] || '', ct = contatos().find(c => c.empresa && (normEmail(c.email).split('@')[1] || '') === dom && !/gmail|hotmail|outlook|yahoo|icloud|live/.test(dom));
+  if (/rnunes/.test(dom)) return 'rnunes'; if (/sigo|magi/.test(dom)) return 'sigo'; if (/^jf|jfe|jfc/.test(dom)) return 'jf';
+  return ct ? ct.empresa : '';
+}
+function sugestoesContatos() {
+  const eu = normEmail(conta && conta.username), vistos = new Map();
+  eventos.forEach(e => (e.attendees || []).concat(e.organizer ? [e.organizer] : []).forEach(a => {
+    const em = normEmail(a.emailAddress ? a.emailAddress.address : a.email), nome = a.emailAddress ? a.emailAddress.name : (a.displayName || '');
+    if (!em || em === eu || !em.includes('@') || contatoPorEmail(em) || /resource\.calendar|calendar\.google|noreply|no-reply/.test(em)) return;
+    const v = vistos.get(em) || { email: em, nome: nome && nome !== em ? nome : '', n: 0 }; v.n++; if (!v.nome && nome && nome !== em) v.nome = nome; vistos.set(em, v);
+  }));
+  return [...vistos.values()].sort((a, b) => b.n - a.n).slice(0, 30);
+}
+let ctBusca = '';
+function vContatos() {
+  const l = contatos(), q = normTxt(ctBusca).trim(), sug = sugestoesContatos();
+  const vis = l.filter(c => !q || normTxt(c.nome + ' ' + c.email + ' ' + (c.cargo || '')).includes(q));
+  const optEmp = v => EMPRESAS_CT.map(([k, n]) => `<option value="${k}" ${(v || '') === k ? 'selected' : ''}>${n}</option>`).join('');
+  const grupo = ([k, n]) => { const g = vis.filter(c => (c.empresa || '') === k).sort((a, b) => (a.nome || a.email).localeCompare(b.nome || b.email)); if (!g.length) return '';
+    const cor = k ? corCategoria(k) : '#94a3b8';
+    return `<div class="ct-g"><h4><i style="background:${cor}"></i>${n}<span>${g.length}</span></h4>${g.map(c => `<div class="ct-r" data-ctid="${c.id}">
+      <input data-ctf="nome" value="${esc(c.nome || '')}" placeholder="Nome"><input data-ctf="email" value="${esc(c.email)}" placeholder="e-mail"><input data-ctf="cargo" value="${esc(c.cargo || '')}" placeholder="Função / obra">
+      <select data-ctf="empresa">${optEmp(c.empresa)}</select><button class="lnk" data-ctdel="${c.id}" title="Excluir">✕</button></div>`).join('')}</div>`; };
+  return abasConfig() + `<div class="ct-wrap"><section class="card">
+    <div class="sec-h"><h3>Contatos</h3><input id="ctBusca" placeholder="Buscar…" value="${esc(ctBusca)}" style="max-width:220px"></div>
+    <div class="ct-novo"><input id="ctNome" placeholder="Nome"><input id="ctEmail" placeholder="e-mail"><input id="ctCargo" placeholder="Função / obra (opcional)"><select id="ctEmp">${optEmp('rnunes')}</select><button class="btn pri" data-acao="ctAdd">Adicionar</button></div>
+    ${EMPRESAS_CT.map(grupo).join('') || '<div class="empty">Nenhum contato ainda. Adicione acima ou use as sugestões ao lado.</div>'}</section>
+    <section class="card"><div class="sec-h"><h3>Sugestões</h3><span class="hint">pessoas das suas reuniões</span></div>
+    ${sug.length ? sug.map(x => `<div class="ct-s"><div><b>${esc(x.nome || x.email)}</b>${x.nome ? `<div class="hint">${esc(x.email)}</div>` : ''}</div><select data-sugemp="${esc(x.email)}">${optEmp(empresaPorEmail(x.email))}</select><button class="btn sm" data-sugadd="${esc(x.email)}" data-sugnome="${esc(x.nome)}">+ Salvar</button></div>`).join('') : '<div class="empty">Sem sugestões no período carregado.</div>'}</section></div>`;
+}
+function addContato(nome, email, empresa, cargo) {
+  email = normEmail(email); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('E-mail inválido.', true); return false; }
+  if (contatoPorEmail(email)) { toast('Esse e-mail já está nos contatos.', true); return false; }
+  contatos().push({ id: uid(), nome: String(nome || '').trim(), email, empresa: empresa || '', cargo: String(cargo || '').trim() }); salvar(); return true;
+}
+/* campo de participantes com contatos */
+function campoParticipantes(id, valor) {
+  return `<div class="ppick" data-pp="${id}"><span class="pp-chips">${chipsParticipantes(valor)}</span><input class="pp-in" placeholder="Digite um nome ou e-mail…" autocomplete="off"><input type="hidden" id="${id}" value="${esc(emailsDe(valor).join(', '))}"><div class="pp-sug"></div></div>`;
+}
+function chipsParticipantes(valor) {
+  return emailsDe(valor).map(e => { const c = contatoPorEmail(e), cor = c && c.empresa ? corCategoria(c.empresa) : '#94a3b8'; return `<span class="pp-chip" title="${esc(e)}"><i style="background:${cor}"></i>${esc(c && c.nome ? c.nome : e)}<button type="button" data-ppdel="${esc(e)}">×</button></span>`; }).join('');
+}
+function ppAtualizar(box, emails) {
+  const h = box.querySelector('input[type=hidden]'); h.value = emails.join(', ');
+  box.querySelector('.pp-chips').innerHTML = chipsParticipantes(h.value); h.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function ppAdd(box, email) { const h = box.querySelector('input[type=hidden]'), l = emailsDe(h.value); email = normEmail(email); if (!l.includes(email)) l.push(email); ppAtualizar(box, l); const i = box.querySelector('.pp-in'); i.value = ''; ppSugerir(box); i.focus(); }
+function ppSugerir(box) {
+  const i = box.querySelector('.pp-in'), q = normTxt(i.value).trim(), ja = emailsDe(box.querySelector('input[type=hidden]').value), sug = box.querySelector('.pp-sug');
+  if (document.activeElement !== i) { sug.innerHTML = ''; return; }
+  const l = contatos().filter(c => !ja.includes(normEmail(c.email)) && (!q || normTxt(c.nome + ' ' + c.email + ' ' + (c.cargo || '')).includes(q)));
+  const nomeEmp = k => (EMPRESAS_CT.find(e => e[0] === (k || '')) || [])[1];
+  let html = '';
+  EMPRESAS_CT.forEach(([k, n]) => { const g = l.filter(c => (c.empresa || '') === k).slice(0, 6); if (g.length) html += `<div class="pp-h">${n}</div>` + g.map(c => `<button type="button" data-ppadd="${esc(c.email)}"><i style="background:${k ? corCategoria(k) : '#94a3b8'}"></i><b>${esc(c.nome || c.email)}</b><span>${esc(c.nome ? c.email : '')}${c.cargo ? ' · ' + esc(c.cargo) : ''}</span></button>`).join(''); });
+  const em = emailsDe(i.value)[0];
+  if (em && !ja.includes(em) && !contatoPorEmail(em)) html += `<button type="button" data-ppadd="${esc(em)}" class="novo">+ Convidar <b>${esc(em)}</b></button><button type="button" data-ppsalvar="${esc(em)}" class="novo">☆ Convidar e salvar nos contatos</button>`;
+  if (!html && !contatos().length) html = '<div class="pp-h" style="text-transform:none">Cadastre pessoas em Configurações → Contatos, ou digite um e-mail.</div>';
+  sug.innerHTML = html;
+}
+document.addEventListener('input', ev => { if (ev.target.id !== 'ctBusca') return; ctBusca = ev.target.value; const pos = ev.target.selectionStart; render(); const n = $('#ctBusca'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } });
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.closest && ev.target.closest('.ct-novo')) { ev.preventDefault(); const b = document.querySelector('[data-acao=ctAdd]'); if (b) b.click(); } });
+document.addEventListener('focusin', ev => { const i = ev.target.closest && ev.target.closest('.pp-in'); if (i) ppSugerir(i.closest('.ppick')); });
+document.addEventListener('input', ev => { const i = ev.target.closest && ev.target.closest('.pp-in'); if (i) ppSugerir(i.closest('.ppick')); });
+document.addEventListener('focusout', ev => { const i = ev.target.closest && ev.target.closest('.pp-in'); if (i) setTimeout(() => { const box = i.closest('.ppick'); if (box && !box.contains(document.activeElement)) { const em = emailsDe(i.value)[0]; if (em) ppAdd(box, em); box.querySelector('.pp-sug').innerHTML = ''; } }, 150); });
+document.addEventListener('keydown', ev => {
+  const i = ev.target.closest && ev.target.closest('.pp-in'); if (!i) return; const box = i.closest('.ppick');
+  if ((ev.key === 'Enter' || ev.key === ',' || ev.key === ';' || ev.key === 'Tab') && i.value.trim()) {
+    const prim = box.querySelector('.pp-sug [data-ppadd]'), em = emailsDe(i.value)[0];
+    if (em || prim) { ev.preventDefault(); ppAdd(box, em || prim.dataset.ppadd); }
+  } else if (ev.key === 'Backspace' && !i.value) { const l = emailsDe(box.querySelector('input[type=hidden]').value); l.pop(); ppAtualizar(box, l); ppSugerir(box); }
+  else if (ev.key === 'Escape') { box.querySelector('.pp-sug').innerHTML = ''; ev.stopPropagation(); }
+});
+document.addEventListener('mousedown', ev => {
+  const b = ev.target.closest && ev.target.closest('.ppick button'); if (!b) { const pk = ev.target.closest && ev.target.closest('.ppick'); if (pk && !ev.target.closest('.pp-in')) { ev.preventDefault(); pk.querySelector('.pp-in').focus(); } return; }
+  ev.preventDefault(); const box = b.closest('.ppick');
+  if (b.dataset.ppdel) { ppAtualizar(box, emailsDe(box.querySelector('input[type=hidden]').value).filter(e => e !== b.dataset.ppdel)); ppSugerir(box); }
+  else if (b.dataset.ppadd) ppAdd(box, b.dataset.ppadd);
+  else if (b.dataset.ppsalvar) { addContato('', b.dataset.ppsalvar, empresaPorEmail(b.dataset.ppsalvar), ''); ppAdd(box, b.dataset.ppsalvar); toast('Salvo nos contatos. Complete o nome em Configurações → Contatos.'); }
+});
 function vProjetos() { return abasConfig() + vProjetos0(); }
 function vProjetos0() {
   if (!selProj) selProj = { tipo: 'area', id: D.areas[0] && D.areas[0].id };
@@ -1662,9 +1786,9 @@ function modalItem(it, novo) {
       <div class="f mm-pos"><label>Qual</label><select id="iPos">${[1, 2, 3, 4, -1].map(p => `<option value="${p}" ${+r.posicao === p ? 'selected' : ''}>${POS[p]}</option>`).join('')}</select></div>
       <div class="f mm-pos"><label>Dia da semana</label><select id="iDsem">${[1, 2, 3, 4, 5, 6, 0].map(i => `<option value="${i}" ${+r.diaSemana === i ? 'selected' : ''}>${DIAS_L[i]}</option>`).join('')}</select></div></div>
   </div>
-  <div class="reu"><div class="f"><label>Participantes (e-mails separados por vírgula)</label><input id="iPart" value="${esc(it.participantes)}"></div>
+  <div class="reu"><div class="f"><label>Participantes</label>${campoParticipantes('iPart', it.participantes)}</div>
     <div class="fr"><div class="f"><label>Local</label><input id="iLocal" value="${esc(it.local)}"></div></div>
-    <label class="cb"><input type="checkbox" id="iTeams" ${it.teams || it.linkReuniao ? 'checked' : ''}> Criar link de reunião online <span class="hint">(Google Meet nas agendas do Google · Teams no Outlook)</span></label>
+    <label class="cb"><input type="checkbox" id="iTeams" ${it.teams || it.linkReuniao || novo ? 'checked' : ''}> Criar link de reunião online <span class="hint">(Google Meet nas agendas do Google · Teams no Outlook)</span></label>
     ${it.linkReuniao ? `<div class="box" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Link:</b> <a href="${esc(it.linkReuniao)}" target="_blank" style="word-break:break-all;flex:1">${esc(it.linkReuniao)}</a><button type="button" class="btn sm" data-copiar="${esc(it.linkReuniao)}">Copiar link</button><button type="button" class="btn sm" data-convite="${it.id}">Copiar convite</button></div>` : ''}</div>
   <div class="fr"><div class="f"><label>Mostrar como</label><select id="iSA">${['busy', 'tentative', 'free', 'oof', 'workingElsewhere'].map(k => `<option value="${k}" ${(it.showAs || 'busy') === k ? 'selected' : ''}>${SHOWAS[k]}</option>`).join('')}</select></div>
     <div class="f"><label>Lembrete (min antes)</label><input type="number" id="iLemb" min="0" value="${it.lembrete}"></div><div class="f" style="flex:2;justify-content:flex-end">
@@ -1827,7 +1951,7 @@ function modalProj(p) {
       <div class="f"><label>Outros nomes usados na agenda (separados por vírgula)</label><input id="pApelidos" value="${esc(p.apelidos || '')}" placeholder="Ex.: Claret, Est. Claret"></div>
       <div class="f"><label>Feriados municipais (dia/mês, separados por vírgula)</label><input id="pFerLoc" value="${esc(p.feriadosLocais || '')}" placeholder="Ex.: 20/01, 24/06"></div>
       <div class="fr"><div class="f"><label>Agenda das reuniões</label><select id="pAgenda"><option value="">Automática</option>${todosCals().filter(k => k.podeEditar).map(k => { const v = k.padrao ? '@principal' : k.id; return `<option value="${esc(v)}" ${p.agendaId === v ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}</option>`; }).join('')}</select></div>
-        <div class="f" style="flex:2"><label>Participantes padrão das reuniões</label><input id="pPart" value="${esc(p.participantes || '')}" placeholder="e-mails separados por vírgula"></div></div>
+        <div class="f" style="flex:2"><label>Participantes padrão das reuniões</label>${campoParticipantes('pPart', p.participantes || '')}</div></div>
       <div class="hint">A categoria gera as pendências automáticas desta obra (agendar reunião, relatórios, tarefas mensais), contando dias úteis com os feriados nacionais, do estado e os municipais acima.</div></div>
     <div class="f"><label>Descrição / observações</label><textarea id="pDesc">${esc(p.descricao)}</textarea></div>
     <div class="acts">${novo ? '' : `<button class="btn dan l" data-acao="excluirProj">Excluir</button>`}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-acao="salvarProj">Salvar</button></div>`);
@@ -1873,6 +1997,8 @@ document.addEventListener('click', async ev => {
   const eEl = t.closest('[data-ev]');
   if (eEl) { ev.stopPropagation(); const e = eventos.find(x => x.id === eEl.dataset.ev); if (e) modalEvento(e); return; }
   const hdd = t.closest('.wk .hd[data-hdia]'); if (hdd) return modalDemanda(null, '', { data: hdd.dataset.hdia });
+  const ctd = t.closest('[data-ctdel]'); if (ctd) { const c = contatos().find(c => c.id === ctd.dataset.ctdel); if (c && confirm('Excluir o contato ' + (c.nome || c.email) + '?')) { D.contatos = contatos().filter(x => x !== c); salvar(); render(); } return; }
+  const sga = t.closest('[data-sugadd]'); if (sga) { const sel = document.querySelector(`[data-sugemp="${CSS.escape(sga.dataset.sugadd)}"]`); if (addContato(sga.dataset.sugnome, sga.dataset.sugadd, sel ? sel.value : '', '')) { toast('Contato salvo.'); render(); } return; }
   const td = t.closest('.tadd[data-tdia]'); if (td) return modalDemanda(null, tFiltro.proj || '', { data: td.dataset.tdia });
   const nd = t.closest('[data-novo-data]'); if (nd) return novoItem({ data: nd.dataset.novoData });
   const nt = t.closest('[data-novo-tipo]'); if (nt) return novoItem(Object.assign({ tipo: nt.dataset.novoTipo }, JSON.parse(nt.dataset.ctx)));
@@ -1926,6 +2052,7 @@ document.addEventListener('click', async ev => {
     case 'salvarSerie': return salvarSerie();
     case 'excluirSerie': return excluirSerie();
     case 'ativarCat': return ativarCategorias();
+    case 'ctAdd': { if (addContato($('#ctNome').value, $('#ctEmail').value, $('#ctEmp').value, $('#ctCargo').value)) { toast('Contato salvo.'); render(); setTimeout(() => $('#ctNome') && $('#ctNome').focus(), 50); } return; }
     case 'toggleRN': { const k = chaveRN(); filtroOff.has(k) ? filtroOff.delete(k) : filtroOff.add(k); gravarFiltro(); return render(); }
     case 'abrirFiltro': filtroAberto = !filtroAberto; return renderFiltros();
     case 'filtroTodas': filtroOff.clear(); gravarFiltro(); return render();
@@ -1983,6 +2110,7 @@ document.addEventListener('change', ev => {
   if (t.id === 'tfProj') { tFiltro.proj = t.value; return render(); }
   if (t.id === 'tfCat') { tFiltro.cat = t.value; return render(); }
   if (t.id === 'tfRot') { tFiltro.rotinas = t.checked; return render(); }
+  if (t.dataset && t.dataset.ctf) { const c = contatos().find(c => c.id === t.closest('[data-ctid]').dataset.ctid); if (c) { const v = t.dataset.ctf === 'email' ? normEmail(t.value) : t.value.trim(); if (t.dataset.ctf === 'email' && (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) || (contatoPorEmail(v) && contatoPorEmail(v) !== c))) { toast('E-mail inválido ou repetido.', true); t.value = c.email; return; } c[t.dataset.ctf] = v; salvar(); if (t.dataset.ctf === 'empresa') render(); } return; }
   if (t.name === 'estEv') { D.config.estiloEventos = t.value; salvar(); return render(); }
   if (t.id === 'cfgUF') { D.config.ufPadrao = t.value; cacheFer.clear(); salvar(); return render(); }
   if (t.id === 'cfgUFver') { vConfig._ufVer = t.value; return render(); }
@@ -2206,7 +2334,7 @@ function modalAgendar(pid, pkey) {
     <div class="f"><label>Título</label><input id="aTit" value="${esc(`Reunião ${sem ? 'semanal' : 'mensal'}`)}"><span class="hint">O nome da obra é acrescentado automaticamente no evento.</span></div>
     <div class="fr"><div class="f"><label>Data</label><input type="date" id="aData" value="${reu ? reu.data : sug}"></div><div class="f"><label>Hora</label><input type="time" id="aHora" value="${(reu && reu.hora) || p.horaReuniao || '09:00'}"></div><div class="f"><label>Duração (min)</label><input type="number" id="aDur" min="15" step="15" value="${p.duracaoReuniao || 60}"></div></div>
     <div class="f"><label>Agenda</label><select id="aCal">${optsCal}</select></div>
-    <div class="f"><label>Participantes (e-mails separados por vírgula)</label><input id="aPart" value="${esc(p.participantes || '')}"></div>
+    <div class="f"><label>Participantes</label>${campoParticipantes('aPart', p.participantes || '')}</div>
     <label class="cb"><input type="checkbox" id="aLink" ${p.linkOnline !== false ? 'checked' : ''}> Criar link de reunião online (Meet / Teams)</label>
     <p class="hint" id="aAviso"></p>
     <div class="acts"><button class="btn l" data-agendar-fora="${pid}|${pkey}" title="Só registra a data; não cria evento">Já agendei por fora</button><button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-agendar-criar="${pid}|${pkey}">Criar reunião na agenda</button></div>`);
@@ -2856,6 +2984,19 @@ function telaLogin(msg) {
   if (gOk()) gCarregarCalendarios().then(() => { faixaEventos = ''; render(); }).catch(e => { erroGoogle = e.message; });
   carregarCalendarios().then(async () => {
     await sincronizarPendentes();
+    if (!D.config.descV1) {
+      const l = D.itens.filter(it => it.outlook && it.sincronizar && !it.vinculado && !it.leitura && !(it.tipo === 'reuniao' && emailsDe(it.participantes).length) && (ehG(it.outlook.calendarId) ? gOk() : conectado()));
+      let n = 0;
+      for (const it of l) {
+        try {
+          if (ehG(it.outlook.calendarId)) await gapi('PATCH', gEv(it.outlook.calendarId, it.outlook.eventId), { description: it.notas || '' });
+          else await graph('PATCH', `${calPath(it.outlook.calendarId)}/events/${it.outlook.eventId}`, { body: { contentType: 'text', content: it.notas || '' } });
+          n++;
+        } catch (e) { }
+      }
+      D.config.descV1 = true; salvar();
+      if (n) toast(`${n} evento(s) limpos: a descrição automática foi removida.`);
+    }
     if (!D.config.titulosV2) {
       const l = D.itens.filter(it => it.outlook && it.sincronizar && !it.vinculado && !it.leitura && !ehG(it.outlook.calendarId));
       for (const it of l) await sincronizar(it);
