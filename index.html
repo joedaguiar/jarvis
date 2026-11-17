@@ -1143,6 +1143,12 @@ function payloadGoogle(it) {
   }
   return ev;
 }
+// Meet: abre já na conta Google conectada (evita o "peça para o organizador liberar")
+function linkEntrar(url) {
+  const em = (typeof gCfg === 'function' && gCfg().email) || '';
+  if (!url || !em || !/^https:\/\/meet\.google\.com\//.test(url) || /[?&]authuser=/.test(url)) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'authuser=' + encodeURIComponent(em);
+}
 const gEv = (calId, evId) => `/calendars/${encodeURIComponent(calId.slice(2))}/events/${encodeURIComponent(evId)}`;
 async function gDiagnostico() {
   const ini = domingo(hoje0()), fim = addDays(ini, 6), off = tzOff();
@@ -1383,7 +1389,7 @@ function vPainel() {
     const tag = x === atual ? '<span class="tag agora">agora</span>' : x === proxima ? `<span class="tag prox">${emMin(x)}</span>` : '';
     const ref = x.k === 'item' ? `data-item="${x.it.id}"` : `data-ev="${esc(x.e.id)}"`;
     const link = x.k === 'ev' ? ((x.e.onlineMeeting && x.e.onlineMeeting.joinUrl) || '') : (x.it.linkReuniao || '');
-    return `<div class="ag ${passou ? 'passou' : ''} ${x === atual ? 'atual' : ''}"><span class="ag-h">${x.hora}<small>${x.fim || ''}</small></span><i style="background:${x.cor}"></i><div class="ag-t" ${ref}>${tituloHtml(x)}${tag}</div>${link && !passou ? `<a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Entrar</a>` : ''}</div>`;
+    return `<div class="ag ${passou ? 'passou' : ''} ${x === atual ? 'atual' : ''}"><span class="ag-h">${x.hora}<small>${x.fim || ''}</small></span><i style="background:${x.cor}"></i><div class="ag-t" ${ref}>${tituloHtml(x)}${tag}</div>${link && !passou ? `<a class="btn sm" href="${esc(linkEntrar(link))}" target="_blank" rel="noopener">Entrar</a>` : ''}</div>`;
   }).join('');
   return `<div class="painel">
     <section class="ola card">
@@ -1789,7 +1795,7 @@ function modalItem(it, novo) {
   <div class="reu"><div class="f"><label>Participantes</label>${campoParticipantes('iPart', it.participantes)}</div>
     <div class="fr"><div class="f"><label>Local</label><input id="iLocal" value="${esc(it.local)}"></div></div>
     <label class="cb"><input type="checkbox" id="iTeams" ${it.teams || it.linkReuniao || novo ? 'checked' : ''}> Criar link de reunião online <span class="hint">(Google Meet nas agendas do Google · Teams no Outlook)</span></label>
-    ${it.linkReuniao ? `<div class="box" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Link:</b> <a href="${esc(it.linkReuniao)}" target="_blank" style="word-break:break-all;flex:1">${esc(it.linkReuniao)}</a><button type="button" class="btn sm" data-copiar="${esc(it.linkReuniao)}">Copiar link</button><button type="button" class="btn sm" data-convite="${it.id}">Copiar convite</button></div>` : ''}</div>
+    ${it.linkReuniao ? `<div class="box" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Link:</b> <a href="${esc(linkEntrar(it.linkReuniao))}" target="_blank" style="word-break:break-all;flex:1">${esc(it.linkReuniao)}</a><button type="button" class="btn sm" data-copiar="${esc(it.linkReuniao)}">Copiar link</button><button type="button" class="btn sm" data-convite="${it.id}">Copiar convite</button></div>` : ''}</div>
   <div class="fr"><div class="f"><label>Mostrar como</label><select id="iSA">${['busy', 'tentative', 'free', 'oof', 'workingElsewhere'].map(k => `<option value="${k}" ${(it.showAs || 'busy') === k ? 'selected' : ''}>${SHOWAS[k]}</option>`).join('')}</select></div>
     <div class="f"><label>Lembrete (min antes)</label><input type="number" id="iLemb" min="0" value="${it.lembrete}"></div><div class="f" style="flex:2;justify-content:flex-end">
     ${it.vinculado ? `<div class="hint">Vinculado a um evento que já existia na agenda.</div>` : '<div class="hint">Com data, o item é gravado como evento na agenda escolhida.</div>'}
@@ -1891,7 +1897,7 @@ function modalEvento(e) {
     <div class="f"><label>Local</label><input id="eLocal" value="${esc(e.location && e.location.displayName)}"></div>
     ${e.seriesMasterId ? `<p class="hint">As alterações acima valem só para esta ocorrência. <button class="btn sm" data-acao="editarSerie">Editar a série inteira…</button></p>` : ''}`
       : `<p>${fmtData(sd)} ${e.isAllDay ? '(dia todo)' : st + '–' + en}</p>${e.location && e.location.displayName ? `<p>Local: ${esc(e.location.displayName)}</p>` : ''}<p class="hint">Este calendário é só para leitura.</p>`}
-    ${join ? `<div class="box" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Link:</b> <a href="${esc(join)}" target="_blank" style="word-break:break-all;flex:1">${esc(join)}</a><button class="btn sm" data-copiar="${esc(join)}">Copiar link</button><button class="btn sm" data-convite-ev="1">Copiar convite</button></div>`
+    ${join ? `<div class="box" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Link:</b> <a href="${esc(linkEntrar(join))}" target="_blank" style="word-break:break-all;flex:1">${esc(join)}</a><button class="btn sm" data-copiar="${esc(join)}">Copiar link</button><button class="btn sm" data-convite-ev="1">Copiar convite</button></div>`
       : (edit ? `<p><button class="btn sm" data-acao="addReuniaoOnline">+ Adicionar link ${c.fonte === 'google' ? 'do Google Meet' : 'do Teams'}</button></p>` : '')}
     <p>${e.webLink ? `<a href="${esc(e.webLink)}" target="_blank">Abrir no ${c.fonte === 'google' ? 'Google Agenda' : 'Outlook'}</a>` : ''}</p>
     <div class="box"><label class="hint" style="font-weight:600">Vincular a um projeto</label>
