@@ -176,6 +176,7 @@ body.mini #outlookStatus .dot{margin:3px}
 .cp-reset{border:0;background:none;color:var(--muted);font:inherit;cursor:pointer;text-decoration:underline}
 .corcat{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line-2)}.corcat:last-child{border-bottom:0}
 .corcat b{width:70px}.corcat .hint{flex:1}
+.stReu{font-size:12.5px;border-radius:10px;padding:7px 10px;margin-bottom:10px}.stReu.ok{background:#e9f6ee;color:#14532d}.stReu.nok{background:#fdecec;color:#7f1d1d}.stReu a{color:inherit;font-weight:700}
 .ppick{position:relative;display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:40px;padding:5px 8px;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:text}
 .ppick:focus-within{border-color:var(--salvia);box-shadow:0 0 0 3px rgba(31,59,82,.08)}
 .pp-chips{display:contents}
@@ -1013,8 +1014,11 @@ async function sincronizar(it) {
     } else {
       const body = payloadEvento(it);
       let r;
-      if (it.outlook) r = await graph('PATCH', `${calPath(cal)}/events/${it.outlook.eventId}`, body);
-      else { r = await graph('POST', `${calPath(cal)}/events`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
+      if (it.outlook) {
+        if (body.body && (it.notasSync || '') === (it.notas || '')) delete body.body; // preserva o bloco "Entrar na reunião do Teams"
+        r = await graph('PATCH', `${calPath(cal)}/events/${it.outlook.eventId}`, body);
+      } else { r = await graph('POST', `${calPath(cal)}/events`, body); it.outlook = { eventId: r.id, calendarId: cal }; }
+      it.notasSync = it.notas || '';
       if (r && r.onlineMeeting && r.onlineMeeting.joinUrl) it.linkReuniao = r.onlineMeeting.joinUrl;
       else if (body.isOnlineMeeting) {
         for (const w of [1500, 3000, 5000]) { await espera(w); const r2 = await graph('GET', `${calPath(cal)}/events/${it.outlook.eventId}?$select=onlineMeeting,isOnlineMeeting`).catch(() => null); if (r2 && r2.onlineMeeting && r2.onlineMeeting.joinUrl) { it.linkReuniao = r2.onlineMeeting.joinUrl; break; } }
@@ -1022,9 +1026,27 @@ async function sincronizar(it) {
       }
     }
     it.erroSync = ''; delete it._pend;
+    if (it.tipo === 'reuniao' && !it.vinculado) await conferirReuniao(it, cal, alvoG).catch(() => { });
     if (it.vinculado) { it.recImport = JSON.stringify(it.recorrencia); it.showAsImport = it.showAs || 'busy'; }
   } catch (e) {
     it.erroSync = e.message; toast((alvoG ? 'Google: ' : 'Outlook: ') + e.message, true);
+  }
+}
+// lê de volta o evento criado e guarda o que o Outlook/Google realmente têm
+async function conferirReuniao(it, cal, alvoG) {
+  if (!it.outlook) return;
+  if (alvoG) {
+    const r = await gapi('GET', gEv(cal, it.outlook.eventId) + '?conferenceDataVersion=1');
+    const link = r.hangoutLink || ((r.conferenceData && r.conferenceData.entryPoints || []).find(e => e.entryPointType === 'video') || {}).uri || '';
+    if (link) it.linkReuniao = link;
+    it.webLink = r.htmlLink || '';
+    it.statusReuniao = { fonte: 'Google', link: !!link, conv: (r.attendees || []).filter(a => !a.self && !a.organizer).length, em: new Date().toISOString() };
+  } else {
+    const r = await graph('GET', `${calPath(cal)}/events/${it.outlook.eventId}?$select=isOnlineMeeting,onlineMeeting,onlineMeetingProvider,attendees,webLink,isOrganizer`);
+    const link = (r.onlineMeeting && r.onlineMeeting.joinUrl) || '';
+    if (link) it.linkReuniao = link;
+    it.webLink = r.webLink || '';
+    it.statusReuniao = { fonte: 'Outlook', link: !!link, teams: !!r.isOnlineMeeting, conv: (r.attendees || []).length, em: new Date().toISOString() };
   }
 }
 async function sincronizarPendentes() {
@@ -1795,6 +1817,7 @@ function modalItem(it, novo) {
   <div class="reu"><div class="f"><label>Participantes</label>${campoParticipantes('iPart', it.participantes)}</div>
     <div class="fr"><div class="f"><label>Local</label><input id="iLocal" value="${esc(it.local)}"></div></div>
     <label class="cb"><input type="checkbox" id="iTeams" ${it.teams || it.linkReuniao || novo ? 'checked' : ''}> Criar link de reunião online <span class="hint">(Google Meet nas agendas do Google · Teams no Outlook)</span></label>
+    ${it.statusReuniao && it.tipo === 'reuniao' ? (() => { const st = it.statusReuniao; return `<div class="stReu ${st.link ? 'ok' : 'nok'}">${st.link ? '✓' : '⚠'} No ${st.fonte}: ${st.link ? (st.fonte === 'Google' ? 'reunião com Google Meet' : 'reunião do Teams') : 'evento <b>sem link de reunião online</b>'} · ${st.conv ? st.conv + ' convidado' + (st.conv > 1 ? 's' : '') : 'sem convidados (no ' + st.fonte + ' aparece como compromisso)'}${it.webLink ? ` · <a href="${esc(it.webLink)}" target="_blank" rel="noopener">abrir no ${st.fonte}</a>` : ''}</div>`; })() : ''}
     ${it.linkReuniao ? `<div class="box" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>Link:</b> <a href="${esc(linkEntrar(it.linkReuniao))}" target="_blank" style="word-break:break-all;flex:1">${esc(it.linkReuniao)}</a><button type="button" class="btn sm" data-copiar="${esc(it.linkReuniao)}">Copiar link</button><button type="button" class="btn sm" data-convite="${it.id}">Copiar convite</button></div>` : ''}</div>
   <div class="fr"><div class="f"><label>Mostrar como</label><select id="iSA">${['busy', 'tentative', 'free', 'oof', 'workingElsewhere'].map(k => `<option value="${k}" ${(it.showAs || 'busy') === k ? 'selected' : ''}>${SHOWAS[k]}</option>`).join('')}</select></div>
     <div class="f"><label>Lembrete (min antes)</label><input type="number" id="iLemb" min="0" value="${it.lembrete}"></div><div class="f" style="flex:2;justify-content:flex-end">
@@ -1873,7 +1896,7 @@ async function salvarItemModal() {
     if (dm) toast('Demanda levada para a agenda.');
   }
   fecharModal(); salvar(); render();
-  if (it.sincronizar || it.outlook) { await sincronizar(it); salvar(); faixaEventos = ''; render(); if (!it.erroSync) toast('Agenda atualizada.'); }
+  if (it.sincronizar || it.outlook) { await sincronizar(it); salvar(); faixaEventos = ''; render(); if (!it.erroSync) toast(it.tipo === 'reuniao' && it.statusReuniao ? (it.statusReuniao.link ? `Reunião criada no ${it.statusReuniao.fonte} com link` + (it.statusReuniao.conv ? ` e ${it.statusReuniao.conv} convite(s) enviado(s).` : '. Sem convidados, ela aparece como compromisso.') : `Evento salvo no ${it.statusReuniao.fonte}, mas sem link de reunião.`) : 'Agenda atualizada.', it.tipo === 'reuniao' && it.statusReuniao && !it.statusReuniao.link); }
 }
 async function excluirItem() {
   const it = D.itens.find(i => i.id === modalItem._id);
@@ -3002,6 +3025,15 @@ function telaLogin(msg) {
       }
       D.config.descV1 = true; salvar();
       if (n) toast(`${n} evento(s) limpos: a descrição automática foi removida.`);
+    }
+    if (!D.config.teamsBodyV1) {
+      // repõe o link do Teams na descrição das reuniões sem convidados que tiveram a descrição limpa
+      const l = D.itens.filter(it => it.tipo === 'reuniao' && it.outlook && !ehG(it.outlook.calendarId) && /teams\.microsoft|teams\.live/.test(it.linkReuniao || '') && !emailsDe(it.participantes).length && !it.vinculado);
+      for (const it of l) {
+        const html = `<div>${esc(it.notas || '').replace(/\n/g, '<br>')}</div><br><div>________________________________________________</div><div><b>Reunião do Microsoft Teams</b></div><div><a href="${esc(it.linkReuniao)}">Clique aqui para ingressar na reunião</a></div><div>________________________________________________</div>`;
+        try { await graph('PATCH', `${calPath(it.outlook.calendarId)}/events/${it.outlook.eventId}`, { body: { contentType: 'html', content: html } }); it.notasSync = it.notas || ''; } catch (e) { }
+      }
+      D.config.teamsBodyV1 = true; salvar();
     }
     if (!D.config.titulosV2) {
       const l = D.itens.filter(it => it.outlook && it.sincronizar && !it.vinculado && !it.leitura && !ehG(it.outlook.calendarId));
