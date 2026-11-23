@@ -224,7 +224,8 @@ body.mini #outlookStatus .dot{margin:3px}
 .pj-per{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-top:2px}
 .pj-reu{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--coral-soft);border-radius:12px;padding:7px 10px}
 .pj-reu small{width:100%;font-size:11px;color:var(--muted)}.pj-reu b{font-size:14px}.pj-reu .btn{margin-left:auto}
-.pj-reu.ok{background:#e9f6ee}.pj-reu.ok b{color:#14532d}
+.pj-reu.ok{background:#e9f6ee;cursor:pointer}.pj-reu.ok b{color:#14532d}.pj-reu.cedo{background:#fff}
+.pj-sec small{font-weight:400;color:var(--muted);font-size:12px;margin-left:4px}
 .pj-et{display:flex;gap:8px;align-items:center;font-size:13px;padding:5px 4px;border-radius:9px;cursor:pointer}.pj-et:hover{background:#fff}
 .pj-et span{flex:1;min-width:0}.pj-et em{font-style:normal;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .pj-et.prev{opacity:.55;cursor:default}.pj-et.prev:hover{background:none}
@@ -1047,8 +1048,8 @@ async function sincronizar(it) {
       const linkG = x => x && (x.hangoutLink || ((x.conferenceData && x.conferenceData.entryPoints || []).find(e => e.entryPointType === 'video') || {}).uri);
       if (linkG(r)) it.linkReuniao = linkG(r);
       else if (body.conferenceData) {
-        for (const w of [1500, 3000, 5000]) { await espera(w); const r2 = await gapi('GET', gEv(cal, it.outlook.eventId) + '?conferenceDataVersion=1').catch(() => null); if (linkG(r2)) { it.linkReuniao = linkG(r2); break; } if (r2 && r2.conferenceData && r2.conferenceData.createRequest && r2.conferenceData.createRequest.status && r2.conferenceData.createRequest.status.statusCode === 'failure') break; }
-        if (!it.linkReuniao) toast('Google: a reunião foi criada, mas o Google não gerou o link do Meet nesta agenda.', true);
+        const evG = it.outlook.eventId; for (const w of [1500, 3000, 5000]) { await espera(w); if (!it.outlook) break; const r2 = await gapi('GET', gEv(cal, evG) + '?conferenceDataVersion=1').catch(() => null); if (linkG(r2)) { it.linkReuniao = linkG(r2); break; } if (r2 && r2.conferenceData && r2.conferenceData.createRequest && r2.conferenceData.createRequest.status && r2.conferenceData.createRequest.status.statusCode === 'failure') break; }
+        if (!it.linkReuniao && it.outlook) toast('Google: a reunião foi criada, mas o Google não gerou o link do Meet nesta agenda.', true);
       }
     } else {
       const body = payloadEvento(it);
@@ -1060,10 +1061,11 @@ async function sincronizar(it) {
       it.notasSync = it.notas || '';
       if (r && r.onlineMeeting && r.onlineMeeting.joinUrl) it.linkReuniao = r.onlineMeeting.joinUrl;
       else if (body.isOnlineMeeting) {
-        for (const w of [1500, 3000, 5000]) { await espera(w); const r2 = await graph('GET', `${calPath(cal)}/events/${it.outlook.eventId}?$select=onlineMeeting,isOnlineMeeting`).catch(() => null); if (r2 && r2.onlineMeeting && r2.onlineMeeting.joinUrl) { it.linkReuniao = r2.onlineMeeting.joinUrl; break; } }
-        if (!it.linkReuniao) toast('Outlook: a reunião foi criada, mas o Teams não gerou o link nesta agenda (agendas compartilhadas de outras pessoas podem não permitir). Use a sua agenda principal.', true);
+        const evO = it.outlook.eventId; for (const w of [1500, 3000, 5000]) { await espera(w); if (!it.outlook) break; const r2 = await graph('GET', `${calPath(cal)}/events/${evO}?$select=onlineMeeting,isOnlineMeeting`).catch(() => null); if (r2 && r2.onlineMeeting && r2.onlineMeeting.joinUrl) { it.linkReuniao = r2.onlineMeeting.joinUrl; break; } }
+        if (!it.linkReuniao && it.outlook) toast('Outlook: a reunião foi criada, mas o Teams não gerou o link nesta agenda (agendas compartilhadas de outras pessoas podem não permitir). Use a sua agenda principal.', true);
       }
     }
+    if (!it.outlook) return;
     it.erroSync = ''; delete it._pend;
     if (it.tipo === 'reuniao' && !it.vinculado) await conferirReuniao(it, cal, alvoG).catch(() => { });
     if (it.vinculado) { it.recImport = JSON.stringify(it.recorrencia); it.showAsImport = it.showAs || 'busy'; }
@@ -1476,33 +1478,45 @@ function vPainel() {
 function tituloAgendaCurto(x) { const t = String(x.titulo || ''); return t.length > 48 ? t.slice(0, 46) + '…' : t; }
 let tFiltro = { proj: '', cat: '', q: '', rotinas: false, modo: (() => { try { return localStorage.getItem('tModo') || 'semana'; } catch { return 'semana'; } })() };
 function abasTarefas() { return `<div class="abas" style="margin:0 8px 0 0"><button class="${tFiltro.modo !== 'projetos' ? 'on' : ''}" data-tmodo="semana">Semana</button><button class="${tFiltro.modo === 'projetos' ? 'on' : ''}" data-tmodo="projetos">Por projeto</button></div>`; }
-// uma coluna por projeto: próxima reunião/medição e as entregas pendentes
+// uma coluna por projeto: semanal (reunião da semana) e mensal (medição + entregas)
+function cartaoCiclo(p, ciclo) {
+  const h = hoje0(), hs = ymd(h), c = ctxFer(p), cor = corEmpresa(p), tg = tagProjeto(p), pt = partesProjeto(p);
+  let pk, rot, reu, cob = null, ets = [], ag;
+  if (ciclo === 'semanal') {
+    const seg = segundaDe(h); pk = 'S:' + ymd(seg); rot = 'Semana de ' + fmtData(ymd(seg));
+    reu = dataReuniao(p.id, pk); cob = !reu && mensalNaSemana(p, seg);
+    const l = tarefasControle(p, seg, addDays(seg, 6)).filter(x => x.pkey === pk); ag = l.find(x => x.acao === 'agendar'); ets = l.filter(x => x.acao !== 'agendar');
+  } else {
+    // mês em andamento: o mais antigo com algo pendente (desde o dia 20); senão o próximo
+    const l = tarefasControle(p, addDays(h, -75), addDays(h, 45)).filter(x => x.pkey.startsWith('M:'));
+    const pend = l.filter(x => !x.feito && x.data <= ymd(addDays(h, 40))).map(x => x.pkey).sort();
+    // ciclo vigente: do dia 20 do mês até o dia 20 do mês seguinte (o que já foi feito continua visível para desmarcar)
+    const mv = h.getDate() >= 20 ? new Date(h.getFullYear(), h.getMonth(), 1) : new Date(h.getFullYear(), h.getMonth() - 1, 1), pkV = `M:${mv.getFullYear()}-${pad(mv.getMonth() + 1)}`;
+    pk = pend[0] && pend[0] < pkV ? pend[0] : pkV;
+    rot = 'Medição de ' + nomeMes(pk.slice(2)); reu = dataReuniao(p.id, pk);
+    const doMes = l.filter(x => x.pkey === pk); ag = doMes.find(x => x.acao === 'agendar'); ets = doMes.filter(x => x.acao !== 'agendar');
+  }
+  const r = ctlPeek(p.id, pk), feitoFora = !reu && r.feitos.agendar;
+  const d20 = pk.startsWith('M:') ? pk.slice(2) + '-20' : '';
+  let st;
+  if (reu) st = `<div class="pj-reu ok" data-agendar="${p.id}|${pk}" title="Remarcar ou desfazer"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}</small><b>${fmtData(reu.data)}${reu.hora ? ' · ' + reu.hora : ''}</b>${reu.it && reu.it.linkReuniao ? '<span class="tag">online</span>' : ''}</div>`;
+  else if (cob) st = `<div class="pj-reu ok"><small>Reunião da semana</small><b>Coberta pela mensal (${fmtData(cob.data)})</b></div>`;
+  else if (feitoFora) st = `<div class="pj-reu ok" data-agendar="${p.id}|${pk}"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}</small><b>Agendada por fora</b></div>`;
+  else { const cedo = ciclo === 'mensal' && hs < d20; st = `<div class="pj-reu ${cedo ? 'cedo' : ''}"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}</small><b>${cedo ? 'Agendar a partir de ' + fmtData(d20) : 'A agendar'}</b><button class="btn sm ${cedo ? '' : 'pri'}" data-agendar="${p.id}|${pk}">Agendar</button></div>`; }
+  const etHtml = ciclo === 'mensal' ? (ets.length
+      ? ets.sort((a, b) => a.data.localeCompare(b.data)).map(x => `<label class="pj-et ${x.feito ? 'done' : ''} ${!x.feito && x.data < hs ? 'late' : ''}"><input type="checkbox" data-ctl="${p.id}|${x.pkey}|${x.tkey}" ${x.feito ? 'checked' : ''}><span>${esc(x.titulo)}</span><em>${fmtData(x.data)}</em></label>`).join('')
+      : etapas('mensal').map(e => `<div class="pj-et prev"><input type="checkbox" disabled><span>${esc(e.nome)}</span><em>${rotuloDias(+e.dias || 0)}</em></div>`).join('')) : '';
+  return `<section class="pjcol" style="--c:${cor}"><header><i style="background:${tg.cor}"></i><div><b>${esc(pt.obra)}</b><small>${esc(pt.construtora || CATEGORIAS[p.categoria].nome)}</small></div></header>
+    <div class="pj-per">${esc(rot)}</div>${st}${etHtml}</section>`;
+}
 function vTarefasProjetos() {
-  const h = hoje0(), hs = ymd(h), ps = D.projetos.filter(p => { const c = CATEGORIAS[p.categoria]; return c && (c.semanal || c.dia20); });
-  const coluna = p => {
-    const l = tarefasControle(p, addDays(h, -60), addDays(h, 45)), sem = CATEGORIAS[p.categoria].semanal;
-    // período atual = o mais antigo com algo pendente; se nada pendente, o próximo
-    const pend = l.filter(x => !x.feito), chaves = [...new Set(l.map(x => x.pkey))].sort();
-    const pk = (pend[0] && pend.map(x => x.pkey).sort()[0]) || chaves.find(k => (k.startsWith('S:') ? ymd(addDays(parseYmd(k.slice(2)), 6)) : k.slice(2) + '-31') >= hs) || chaves[chaves.length - 1];
-    if (!pk) return '';
-    const doPer = l.filter(x => x.pkey === pk), ag = doPer.find(x => x.acao === 'agendar'), reu = dataReuniao(p.id, pk);
-    const cor = corEmpresa(p), tg = tagProjeto(p), pt = partesProjeto(p);
-    const rotPer = pk.startsWith('S:') ? 'Semana de ' + fmtData(pk.slice(2)) : nomeMes(pk.slice(2));
-    const status = reu ? `<div class="pj-reu ok"><small>${sem ? 'Reunião' : 'Próxima medição'}</small><b>${fmtData(reu.data)}${reu.hora ? ' · ' + reu.hora : ''}</b></div>`
-      : `<div class="pj-reu"><small>${sem ? 'Reunião' : 'Próxima medição'}</small><b>A agendar</b>${ag && !ag.feito ? `<button class="btn sm pri" data-agendar="${p.id}|${pk}">Agendar</button>` : ''}</div>`;
-    const ets = doPer.filter(x => x.acao !== 'agendar').sort((a, b) => a.data.localeCompare(b.data));
-    const dem = D.itens.filter(i => i.demanda && i.projetoId === p.id && i.data && !i.concluidas[i.data]).sort((a, b) => a.data.localeCompare(b.data)).slice(0, 4);
-    return `<section class="pjcol" style="--c:${cor}"><header><i style="background:${tg.cor}"></i><div><b>${esc(pt.obra)}</b><small>${esc(pt.construtora || CATEGORIAS[p.categoria].nome)}</small></div></header>
-      <div class="pj-per">${esc(rotPer)}</div>${status}
-      ${!ets.length && !reu && !sem ? etapas(p.categoria).map(e => `<div class="pj-et prev"><input type="checkbox" disabled><span>${esc(e.nome)}</span><em>após agendar</em></div>`).join('') : ''}
-      ${ets.length ? ets.map(x => `<label class="pj-et ${x.feito ? 'done' : ''} ${!x.feito && x.data < hs ? 'late' : ''}"><input type="checkbox" data-ctl="${p.id}|${x.pkey}|${x.tkey}" ${x.feito ? 'checked' : ''}><span>${esc(x.titulo)}</span><em>${fmtData(x.data)}</em></label>`).join('') : (!reu && !sem && etapas(p.categoria).length ? '' : '<div class="hint" style="padding:4px 2px">Sem etapas.</div>')}
-      ${dem.length ? `<div class="pj-dem"><small>Demandas</small>${dem.map(i => `<div data-item="${i.id}" class="${i.data < hs ? 'late' : ''}"><span>${esc(i.titulo)}</span><em>${fmtData(i.data)}</em></div>`).join('')}</div>` : ''}
-    </section>`;
-  };
-  const sec = (tit, l) => l.length ? `<h3 class="pj-sec">${tit}<span>${l.length}</span></h3><div class="pjgrid">${l.map(coluna).join('')}</div>` : '';
-  const semanais = ps.filter(p => CATEGORIAS[p.categoria].semanal), mensais = ps.filter(p => CATEGORIAS[p.categoria].dia20);
+  const ps = D.projetos.filter(p => CATEGORIAS[p.categoria] && (CATEGORIAS[p.categoria].semanal || CATEGORIAS[p.categoria].dia20));
+  const seguro = (p, c) => { try { return cartaoCiclo(p, c); } catch (e) { console.warn('cartão', p.nome, e); return `<section class="pjcol"><b>${esc(p.nome)}</b><div class="hint">Não foi possível montar este cartão.</div></section>`; } };
+  const sec = (tit, sub, l, c) => l.length ? `<h3 class="pj-sec">${tit}<span>${l.length}</span><small>${sub}</small></h3><div class="pjgrid">${l.map(p => seguro(p, c)).join('')}</div>` : '';
+  const sem = ps.filter(p => CATEGORIAS[p.categoria].semanal), men = ps.filter(p => CATEGORIAS[p.categoria].dia20);
   return `<div class="cal-head">${abasTarefas()}<span class="lbl">Entregas por projeto</span><span style="flex:1"></span></div>
-    ${sec('Semanal', semanais)}${sec('Mensal', mensais)}${ps.length ? '' : '<div class="empty">Nenhum projeto com rotina Sienge/Project.</div>'}`;
+    ${sec('Semanal', 'agendar na segunda · reunião no fim da semana · sem relatório', sem, 'semanal')}${sec('Mensal', 'agendar a partir do dia 20 · relatórios junto com a reunião', men, 'mensal')}
+    ${ps.length ? '' : '<div class="empty">Nenhuma obra com ciclo semanal ou mensal. Defina a categoria em Configurações → Empresas e projetos.</div>'}`;
 }
 function vTarefas() {
   if (tFiltro.modo === 'projetos') return vTarefasProjetos();
@@ -1826,12 +1840,13 @@ function vConfig0() {
       <p class="hint">Se uma empresa tiver um calendário vinculado (do Outlook ou do Google), os eventos desse calendário ganham a cor da empresa, e os itens dela são gravados lá (quando você tem permissão de edição).</p>
     </div></div><div>
     <div class="card"><h3>Calendários exibidos</h3>${cals}<p class="hint">Clique na bolinha para trocar a cor da agenda aqui no sistema (no Outlook e no Google não muda). Agendas com o mesmo <b>grupo</b> aparecem como uma só no filtro do topo.</p></div>
-    <div class="card"><h3>Etapas das rotinas (entregas)</h3>
-      <p class="hint" style="margin-top:-4px">O que precisa ser entregue em cada reunião. A data de cada etapa é contada a partir do dia da reunião agendada.</p>
-      ${ROTINAS.map(([k, n]) => `<div class="etg"><h4>${n}</h4>
-        <div class="etr fixo"><span>1</span><input value="Agendar a reunião${k === 'semanal_mes' ? ' (a da semana)' : ''}" disabled><em>${k.startsWith('semanal') ? 'início da semana' : 'a partir do dia 20'}</em><i></i></div>
+    <div class="card"><h3>Ciclos das obras</h3>
+      <p class="hint" style="margin-top:-4px">Sienge Semanal = ciclo semanal + mensal. Sienge Mensal e Project Mensal = só o mensal. Ao agendar, a reunião fica ligada ao ciclo e as entregas acompanham a data dela.</p>
+      ${ROTINAS.map(([k, n, d]) => `<div class="etg"><h4>${n} <span class="hint" style="font-weight:400">· ${d}</span></h4>
+        <div class="etr fixo"><span>1</span><input value="Agendar a reunião" disabled><em>${k === 'semanal' ? 'segunda-feira' : 'a partir do dia 20'}</em><i></i></div>
         ${etapas(k).map((e, i) => `<div class="etr"><span>${i + 2}</span><input data-etn="${k}|${i}" value="${esc(e.nome)}"><select data-etd="${k}|${i}">${[-3, -2, -1, 0, 1, 2, 3, 4, 5].map(n => `<option value="${n}" ${(+e.dias || 0) === n ? 'selected' : ''}>${rotuloDias(n)}</option>`).join('')}</select><button class="lnk" data-etx="${k}|${i}" title="Remover">✕</button></div>`).join('')}
-        <button class="btn sm" data-eta="${k}">+ Etapa</button></div>`).join('')}</div>
+        ${!etapas(k).length ? `<div class="hint" style="margin:2px 0 6px 28px">${k === 'semanal' ? 'Sem entregas: só a reunião.' : 'Sem entregas.'}</div>` : ''}
+        <button class="btn sm" data-eta="${k}">+ Entrega</button></div>`).join('')}</div>
     <div class="card"><h3>Cores das categorias</h3>
       <p class="hint" style="margin-top:-4px">Usadas nas demandas, nas bolinhas do dia e nos cartões de Tarefas.</p>
       ${CATS_COR.map(([k, n]) => { const own = (D.config.coresCategoria || {})[k], c = corCategoria(k); return `<div class="corcat">${botaoCor('cat', k, c)}<b>${n}</b><span class="hint">${own ? 'personalizada' : k === 'rnunes' ? 'padrão: roxo da agenda do Rodrigo Nunes' : 'padrão'}</span></div>`; }).join('')}</div>
@@ -1870,10 +1885,11 @@ function modalItem(it, novo) {
   const optsCal = (todosCals().some(k => k.padrao) ? '' : `<option value="@principal" ${!calAtual ? 'selected' : ''}>Outlook · Calendário principal</option>`) +
     editaveis.map(k => `<option value="${k.padrao ? '@principal' : esc(k.id)}" ${(k.padrao ? !calAtual : calAtual === k.id) ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}${k.podeEditar ? '' : ' (só leitura)'}</option>`).join('');
   const dsel = r.dias || [];
-  abrirModal(`<h3>${it.origemDemanda ? 'Levar demanda para a agenda' : novo ? 'Novo agendamento' : 'Editar agendamento'}</h3>${it.origemDemanda ? '<p class="hint" style="margin-top:-6px">Ao salvar, a demanda sai da lista de demandas e vira este agendamento.</p>' : ''}
+  abrirModal(`<h3>${it.origemDemanda ? 'Levar demanda para a agenda' : novo ? 'Novo agendamento' : 'Editar agendamento'}${it.controle ? ` <span class="tag">${it.controle.split('|')[1].startsWith('S:') ? 'reunião semanal' : 'reunião mensal · ' + nomeMes(it.controle.split('|')[1].slice(2))}</span>` : ''}</h3>${it.origemDemanda ? '<p class="hint" style="margin-top:-6px">Ao salvar, a demanda sai da lista de demandas e vira este agendamento.</p>' : ''}
   <div class="fr"><div class="f" style="flex:2"><label>Título</label><input id="iTit" value="${esc(it.titulo)}" placeholder="Ex.: Relatório semanal de avanço"></div>
     <div class="f"><label>Tipo</label><select id="iTipo">${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}" ${k === it.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
   <div class="fr"><div class="f"><label>Agenda</label><div style="display:flex;gap:6px;align-items:center"><span class="sw" id="iCalSw" style="width:14px;height:14px;background:${corItem(it)}"></span><select id="iCal" style="flex:1">${optsCal}</select></div></div><div class="f"><label>Projeto / obra</label><select id="iProj">${optsProj}</select></div></div>
+  <div class="f reu" id="iCicloBox"><label>Esta reunião é do ciclo</label><select id="iCiclo"></select><span class="hint" id="iCicloInfo"></span></div>
   <div class="fr"><div class="f"><label id="lblData">Data</label><input type="date" id="iData" value="${it.data}"></div>
     <div class="f"><label>Hora (vazio = dia todo)</label><input type="time" id="iHora" value="${it.hora}"></div>
     <div class="f"><label>Duração (min)</label><input type="number" id="iDur" min="5" step="5" value="${it.duracao}"></div></div>
@@ -1927,6 +1943,24 @@ function modalItem(it, novo) {
     $$('.iDow').forEach(c => c.checked = sel.includes(+c.value)); diasMudaram();
   }));
   $('#iRep').addEventListener('change', () => { if ($('#iRep').value === 'semanal' && !$$('.iDow:checked').length && $('#iData').value) { const d = parseYmd($('#iData').value).getDay(); $$('.iDow').forEach(c => c.checked = +c.value === d); } upd(); });
+  const ciclo = () => {
+    const pid = $('#iProj').value, p = projeto(pid), cat = p && CATEGORIAS[p.categoria], d = $('#iData').value, box = $('#iCicloBox');
+    const atual = it.controle && it.controle.split('|')[0] === pid ? it.controle.split('|')[1] : '';
+    if (!cat || !(cat.semanal || cat.dia20) || $('#iTipo').value !== 'reuniao') { box.style.display = 'none'; $('#iCiclo').innerHTML = '<option value=""></option>'; return; }
+    box.style.display = '';
+    const op = [['', '— nenhum (reunião avulsa) —']], dd = d ? parseYmd(d) : hoje0();
+    if (cat.semanal) op.push(['S:' + ymd(segundaDe(dd)), 'Reunião semanal · semana de ' + fmtData(ymd(segundaDe(dd)))]);
+    if (cat.dia20) { const m = dd.getDate() >= 15 ? dd : new Date(dd.getFullYear(), dd.getMonth() - 1, 1), ant = new Date(m.getFullYear(), m.getMonth(), 1), seg = new Date(ant.getFullYear(), ant.getMonth() + 1, 1);
+      [ant, seg].forEach(x => { const ym = `${x.getFullYear()}-${pad(x.getMonth() + 1)}`; op.push(['M:' + ym, 'Reunião mensal · medição de ' + nomeMes(ym)]); }); }
+    if (atual && !op.some(o => o[0] === atual)) op.push([atual, (atual.startsWith('S:') ? 'Reunião semanal · semana de ' + fmtData(atual.slice(2)) : 'Reunião mensal · ' + nomeMes(atual.slice(2)))]);
+    const sel = $('#iCiclo').dataset.toque ? $('#iCiclo').value : atual;
+    $('#iCiclo').innerHTML = op.map(([v, n]) => `<option value="${v}" ${v === sel ? 'selected' : ''}>${n}</option>`).join('');
+    const v = $('#iCiclo').value, outro = v && dataReuniao(pid, v);
+    $('#iCicloInfo').textContent = v && outro && (!outro.it || outro.it.id !== it.id) ? `Esse ciclo já tem reunião em ${fmtData(outro.data)}; esta passa a ser a reunião dele.` : v.startsWith('M:') ? 'As entregas do mensal (relatórios) seguem a data desta reunião.' : '';
+  };
+  $('#iCiclo').addEventListener('change', () => { $('#iCiclo').dataset.toque = '1'; ciclo(); });
+  ['#iProj', '#iData', '#iTipo'].forEach(x => $(x).addEventListener('change', ciclo));
+  setTimeout(ciclo, 0);
   $('#iTipo').addEventListener('change', () => {
     const t = $('#iTipo').value;
     if (t === 'reuniao' && !it.outlook) { if (!$('#iHora').value) $('#iHora').value = '09:00'; }
@@ -1961,6 +1995,11 @@ async function salvarItemModal() {
   it.sincronizar = !!it.data && !it.leitura && !it.demanda;
   if (it.sincronizar) it._pend = true;
   it.areaId = areaDoItem(it);
+  { // vínculo da reunião com o ciclo da obra (semanal / mensal)
+    const novoCiclo = it.tipo === 'reuniao' && $('#iCiclo') && $('#iCiclo').value ? it.projetoId + '|' + $('#iCiclo').value : '';
+    if (it.controle && it.controle !== novoCiclo) { const [a, b] = it.controle.split('|'), r = ctlPeek(a, b); if (r.reuniaoItem === it.id) delete r.reuniaoItem; delete it.controle; }
+    if (novoCiclo) { const [a, b] = novoCiclo.split('|'), r = ctlRec(a, b); r.reuniaoItem = it.id; delete r.reuniaoData; it.controle = novoCiclo; }
+  }
   D.config.ultimoCal = it.calendarioId;
   if (novo) D.itens.push(it);
   if (novo && it.origemDemanda) {
@@ -2047,7 +2086,7 @@ function modalProj(p) {
     <div class="f"><label>Nome</label><input id="pNome" value="${esc(p.nome)}" placeholder="Ex.: Obra Residencial Jardins"></div>
     <div class="fr"><div class="f"><label>Empresa / área</label><select id="pArea">${D.areas.map(a => `<option value="${a.id}" ${a.id === p.areaId ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></div>
       <div class="f"><label>Tipo</label><select id="pTipo"><option value="obra" ${p.tipo === 'obra' ? 'selected' : ''}>Obra</option><option value="projeto" ${p.tipo === 'projeto' ? 'selected' : ''}>Projeto</option></select></div></div>
-    <div class="box"><div class="fr"><div class="f"><label>Categoria de controle</label><select id="pCat"><option value="">— nenhuma —</option>${Object.entries(CATEGORIAS).map(([k, c]) => `<option value="${k}" ${p.categoria === k ? 'selected' : ''}>${c.nome}</option>`).join('')}</select></div>
+    <div class="box"><div class="fr"><div class="f"><label>Categoria de controle</label><select id="pCat"><option value="">— nenhuma —</option>${Object.entries(CATEGORIAS).map(([k, c]) => `<option value="${k}" ${p.categoria === k ? 'selected' : ''}>${c.nome}${c.semanal && c.dia20 ? ' (semanal + mensal)' : c.dia20 ? ' (só mensal)' : ''}</option>`).join('')}</select></div>
       <div class="f"><label>Local (cidade)</label><input id="pLocal" value="${esc(p.local || '')}" placeholder="Ex.: Niterói"></div>
       <div class="f" style="max-width:110px"><label>Estado</label><select id="pUF">${UFS.map(u => `<option ${(p.uf || D.config.ufPadrao || 'RJ') === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div></div>
       <div class="fr"><div class="f"><label>Etiqueta (nome curto)</label><input id="pTag" value="${esc(p.tag || '')}" placeholder="${esc(partesProjeto(p.nome ? p : { nome: '' }).obra || 'Ex.: Studios Claret')}"></div>
@@ -2076,9 +2115,10 @@ document.addEventListener('click', async ev => {
   if (suprimirClique) { suprimirClique = false; ev.stopPropagation(); return; }
   const mv = t.closest('[data-mover]'); if (mv) return confirmarMover(mv.dataset.mover);
   const ctlc = t.closest('[data-ctl]');
-  if (ctlc) { const [pid, pkey, tkey] = ctlc.dataset.ctl.split('|'); if (tkey === 'agendar' && ctlc.checked) { ctlc.checked = false; return modalAgendar(pid, pkey); } return marcarCtl(pid, pkey, tkey, ctlc.checked); }
+  if (ctlc) { const [pid, pkey, tkey] = ctlc.dataset.ctl.split('|'); if (tkey === 'agendar') { ctlc.checked = !ctlc.checked; return modalAgendar(pid, pkey); } return marcarCtl(pid, pkey, tkey, ctlc.checked); }
   const ag = t.closest('[data-agendar]'); if (ag) { ev.stopPropagation(); const [pid, pkey] = ag.dataset.agendar.split('|'); return modalAgendar(pid, pkey); }
   const agc = t.closest('[data-agendar-criar]'); if (agc) { const [pid, pkey] = agc.dataset.agendarCriar.split('|'); return agendarCriar(pid, pkey); }
+  const agd = t.closest('[data-agendar-desfazer]'); if (agd) { const [pid, pkey] = agd.dataset.agendarDesfazer.split('|'); return agendarDesfazer(pid, pkey); }
   const agf = t.closest('[data-agendar-fora]'); if (agf) { const [pid, pkey] = agf.dataset.agendarFora.split('|'); return agendarFora(pid, pkey); }
   const cp = t.closest('[data-copiar]'); if (cp) { ev.preventDefault(); return copiarTexto(cp.dataset.copiar, 'Link copiado.'); }
   const cv = t.closest('[data-convite]'); if (cv) { ev.preventDefault(); const it = D.itens.find(i => i.id === cv.dataset.convite); return copiarTexto(textoConvite(it.titulo, it.data, it.hora, it.duracao, it.linkReuniao), 'Convite copiado.'); }
@@ -2347,25 +2387,21 @@ const nomeMes = ym => { const [y, m] = ym.split('-').map(Number); return `${MESE
 /* ================= categorias de controle ================= */
 const TAREFAS_SIENGE = ['Reprogramar o Project', 'Enviar a medição para o Sienge', 'Ajustar a data de medição no Sienge', 'Enviar o Project para o sistema R. Nunes', 'Baixar a medição do Sienge no sistema R. Nunes', 'Fazer o fechamento mensal'];
 const CATEGORIAS = {
-  sienge_semanal: { nome: 'Sienge Semanal', semanal: true },
+  sienge_semanal: { nome: 'Sienge Semanal', semanal: true, dia20: true },
   sienge_mensal: { nome: 'Sienge Mensal', dia20: true },
   project_mensal: { nome: 'Project Mensal', dia20: true },
   pessoal: { nome: 'Pessoal' }
 };
 /* etapas (entregas) de cada rotina — editáveis em Configurações; dias = dias úteis a partir da reunião (0 = no dia) */
 const ROTINAS = [
-  ['semanal', 'Sienge Semanal — toda semana'],
-  ['semanal_mes', 'Sienge Semanal — última semana do mês (fechamento)'],
-  ['sienge_mensal', 'Sienge Mensal'],
-  ['project_mensal', 'Project Mensal']
+  ['semanal', 'Reunião semanal', 'agendar na segunda; reunião no fim da semana'],
+  ['mensal', 'Reunião mensal (medição)', 'agendar a partir do dia 20']
 ];
 const ETAPAS_PADRAO = {
-  semanal: [{ id: 'relatorios', nome: 'Enviar os relatórios', dias: 0 }],
-  semanal_mes: [],
-  sienge_mensal: [{ id: 'relatorios', nome: 'Enviar os relatórios', dias: 0 }],
-  project_mensal: [{ id: 'relatorios', nome: 'Enviar os relatórios', dias: 0 }]
+  semanal: [],
+  mensal: [{ id: 'relatorios', nome: 'Enviar os relatórios', dias: 0 }]
 };
-function etapas(k) { const e = (D.config.etapas || {})[k]; return Array.isArray(e) ? e : ETAPAS_PADRAO[k] || []; }
+function etapas(k) { if (k !== 'semanal') k = 'mensal'; const e = (D.config.etapas || {})[k]; return Array.isArray(e) ? e : ETAPAS_PADRAO[k] || []; }
 function deslocUteis(d, n, c) { if (!n) return d; let x = d, k = 0; const st = n > 0 ? 1 : -1; for (let i = 0; i < 60 && k < Math.abs(n); i++) { x = addDays(x, st); if (ehUtil(x, c)) k++; } return x; }
 const rotuloDias = n => !n ? 'no dia da reunião' : n > 0 ? `${n} dia${n > 1 ? 's' : ''} út${n > 1 ? 'eis' : 'il'} depois` : `${-n} dia${n < -1 ? 's' : ''} út${n < -1 ? 'eis' : 'il'} antes`;
 function ctlRec(pid, pkey) {
@@ -2382,6 +2418,12 @@ function dataReuniao(pid, pkey) {
   return null;
 }
 // gera as tarefas de controle de um projeto com vencimento entre ini e fim
+// a reunião mensal agendada dentro da semana vale como a reunião semanal daquela semana
+function mensalNaSemana(p, seg) {
+  const a = ymd(seg), b = ymd(addDays(seg, 6));
+  for (let k = -1; k <= 1; k++) { const m = new Date(seg.getFullYear(), seg.getMonth() + k, 1), r = dataReuniao(p.id, `M:${m.getFullYear()}-${pad(m.getMonth() + 1)}`); if (r && r.data >= a && r.data <= b) return r; }
+  return null;
+}
 function tarefasControle(p, ini, fim) {
   const cat = CATEGORIAS[p.categoria]; if (!cat || !(cat.semanal || cat.dia20)) return [];
   const c = ctxFer(p), desde = parseYmd(p.controleDesde || ymd(segundaDe(hoje0())));
@@ -2394,11 +2436,10 @@ function tarefasControle(p, ini, fim) {
   if (cat.semanal) {
     for (let seg = segundaDe(addDays(ini, -6) > desde ? addDays(ini, -6) : desde); seg <= fim; seg = addDays(seg, 7)) {
       if (addDays(seg, 6) < desde) continue;
-      const pkey = 'S:' + ymd(seg), r = ctlPeek(p.id, pkey), reu = dataReuniao(p.id, pkey);
+      const pkey = 'S:' + ymd(seg), r = ctlPeek(p.id, pkey), reu = dataReuniao(p.id, pkey), cob = mensalNaSemana(p, seg);
       const dReu = reu ? parseYmd(reu.data) : ultimoUtilSemana(seg, c), d1 = primeiroUtilSemana(seg, c);
-      add(pkey, 'agendar', 'Agendar a reunião semanal', d1, { acao: 'agendar', feito: !!reu || !!r.feitos.agendar, reuniao: reu, sugestao: ymd(ultimoUtilSemana(seg, c)), periodo: 'semana de ' + fmtData(ymd(seg)) });
-      etapas('semanal').forEach(e => add(pkey, e.id, e.nome, deslocUteis(dReu, +e.dias || 0, c), { etapa: true }));
-      if (ultimaSemanaDoMes(seg)) etapas('semanal_mes').forEach(e => add(pkey, e.id, e.nome, deslocUteis(dReu, +e.dias || 0, c), { etapa: true, mensal: nomeMes(mesDaSemana(seg)) }));
+      add(pkey, 'agendar', 'Agendar a reunião semanal', d1, { acao: 'agendar', ciclo: 'semanal', feito: !!reu || !!r.feitos.agendar || !!cob, reuniao: reu || cob, coberta: !reu && !!cob, sugestao: ymd(ultimoUtilSemana(seg, c)), periodo: 'semana de ' + fmtData(ymd(seg)) });
+      if (!cob) etapas('semanal').forEach(e => add(pkey, e.id, e.nome, deslocUteis(dReu, +e.dias || 0, c), { etapa: true, ciclo: 'semanal' }));
     }
   }
   if (cat.dia20) {
@@ -2407,10 +2448,10 @@ function tarefasControle(p, ini, fim) {
       const ym = `${m.getFullYear()}-${pad(m.getMonth() + 1)}`, pkey = 'M:' + ym, r = ctlPeek(p.id, pkey), reu = dataReuniao(p.id, pkey);
       const d20 = new Date(m.getFullYear(), m.getMonth(), 20);
       if (d20 < desde && !reu) continue;
-      add(pkey, 'agendar', `Agendar a reunião mensal (${nomeMes(ym)})`, d20, { acao: 'agendar', feito: !!reu || !!r.feitos.agendar, reuniao: reu, alerta: true, periodo: nomeMes(ym) });
+      add(pkey, 'agendar', `Agendar a reunião mensal (${nomeMes(ym)})`, d20, { acao: 'agendar', ciclo: 'mensal', feito: !!reu || !!r.feitos.agendar, reuniao: reu, alerta: true, periodo: nomeMes(ym) });
       if (reu) {
         const dReu = parseYmd(reu.data);
-        etapas(p.categoria).forEach(e => add(pkey, e.id, e.nome, deslocUteis(dReu, +e.dias || 0, c), { etapa: true, mensal: nomeMes(ym) }));
+        etapas('mensal').forEach(e => add(pkey, e.id, e.nome, deslocUteis(dReu, +e.dias || 0, c), { etapa: true, ciclo: 'mensal', mensal: nomeMes(ym), reuniao: reu }));
       }
     }
   }
@@ -2454,12 +2495,13 @@ function modalAgendar(pid, pkey) {
     <div class="f"><label>Agenda</label><select id="aCal">${optsCal}</select></div>
     <div class="f"><label>Participantes</label>${campoParticipantes('aPart', p.participantes || '')}</div>
     <label class="cb"><input type="checkbox" id="aLink" ${p.linkOnline !== false ? 'checked' : ''}> Criar link de reunião online (Meet / Teams)</label>
-    <div class="box aEnt"><b>Entregas desta reunião</b><div id="aEntregas"></div></div>
+    ${sem && !reu && mensalNaSemana(p, parseYmd(pkey.slice(2))) ? `<p class="hint" style="background:#e9f6ee;color:#14532d;padding:7px 10px;border-radius:10px">A reunião mensal desta obra já está nesta semana (${fmtData(mensalNaSemana(p, parseYmd(pkey.slice(2))).data)}) e vale como a semanal. Só agende se quiser uma reunião semanal separada.</p>` : ''}
+    <div class="box aEnt"><b>${sem ? 'Reunião semanal' : 'Reunião mensal (medição)'}: o que vem junto</b><div id="aEntregas"></div></div>
     <p class="hint" id="aAviso"></p>
-    <div class="acts"><button class="btn l" data-agendar-fora="${pid}|${pkey}" title="Só registra a data; não cria evento">Já agendei por fora</button><button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-agendar-criar="${pid}|${pkey}">Criar reunião na agenda</button></div>`);
-  const lEt = sem ? etapas('semanal').concat(ultimaSemanaDoMes(parseYmd(pkey.slice(2))) ? etapas('semanal_mes') : []) : etapas(p.categoria);
+    <div class="acts">${reu || ctlPeek(pid, pkey).feitos.agendar ? `<button class="btn dan l" data-agendar-desfazer="${pid}|${pkey}" title="Volta para 'a agendar'${reu && reu.it ? ' e apaga a reunião da agenda' : ''}">Desfazer agendamento</button>` : `<button class="btn l" data-agendar-fora="${pid}|${pkey}" title="Só registra a data; não cria evento">Já agendei por fora</button>`}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-agendar-criar="${pid}|${pkey}">Criar reunião na agenda</button></div>`);
+  const lEt = sem ? etapas('semanal') : etapas('mensal');
   const av = () => { const d = $('#aData').value; $('#aAviso').textContent = d && !ehUtil(parseYmd(d), c) ? '⚠ Essa data não é dia útil para esta obra (' + c.uf + ').' : '';
-    $('#aEntregas').innerHTML = lEt.length ? lEt.map(e => `<div class="aEnt-r"><span>${d ? fmtData(ymd(deslocUteis(parseYmd(d), +e.dias || 0, c))) : '—'}</span>${esc(e.nome)}<em>${rotuloDias(+e.dias || 0)}</em></div>`).join('') : '<div class="hint">Nenhuma etapa configurada. Edite em Configurações → Etapas das rotinas.</div>'; };
+    $('#aEntregas').innerHTML = lEt.length ? lEt.map(e => `<div class="aEnt-r"><span>${d ? fmtData(ymd(deslocUteis(parseYmd(d), +e.dias || 0, c))) : '—'}</span>${esc(e.nome)}<em>${rotuloDias(+e.dias || 0)}</em></div>`).join('') : `<div class="hint">${sem ? 'Semanal não tem entrega de relatório: só a reunião.' : 'Nenhuma entrega configurada (Configurações → Etapas das rotinas).'}</div>`; };
   $('#aData').addEventListener('change', av); av();
 }
 async function agendarCriar(pid, pkey) {
@@ -2473,6 +2515,14 @@ async function agendarCriar(pid, pkey) {
   fecharModal(); salvar(); render();
   await sincronizar(it); salvar(); faixaEventos = ''; render();
   if (!it.erroSync) toast('Reunião criada na agenda' + (it.linkReuniao ? ' com link.' : '.'));
+}
+async function agendarDesfazer(pid, pkey) {
+  const r = ctlRec(pid, pkey), it = r.reuniaoItem ? D.itens.find(i => i.id === r.reuniaoItem) : null;
+  if (!confirm(it ? 'Desfazer o agendamento? A reunião criada pelo sistema também será apagada da agenda.' : 'Desfazer o agendamento?')) return;
+  delete r.reuniaoItem; delete r.reuniaoData; delete r.reuniaoHora; delete r.feitos.agendar;
+  fecharModal();
+  if (it) { delete it.controle; if (it.outlook && !it.vinculado) { it.sincronizar = false; await sincronizar(it).catch(() => { }); } D.itens = D.itens.filter(i => i !== it); faixaEventos = ''; }
+  salvar(); render(); toast('Agendamento desfeito.');
 }
 function agendarFora(pid, pkey) {
   const d = $('#aData').value; if (!d) return toast('Escolha a data.', true);
@@ -2802,7 +2852,7 @@ function navegar(dir) {
 let swipe = null;
 const alvoSwipe = () => $('#view .wk, #view .mes, #view .semana, #view .tsem');
 document.addEventListener('pointerdown', ev => {
-  if (!['tarefas', 'calendario'].includes(vista) || ev.button !== 0) return;
+  if (!['tarefas', 'calendario'].includes(vista) || ev.button !== 0 || (vista === 'tarefas' && tFiltro.modo === 'projetos')) return;
   if (!ev.target.closest('#view') || ev.target.closest('.ev.movel, [data-arrasta], button, input, select, a, textarea, .cal-head')) return;
   swipe = { x: ev.clientX, y: ev.clientY, ativo: false };
 });
@@ -2824,14 +2874,14 @@ document.addEventListener('pointerup', ev => {
 document.addEventListener('pointercancel', () => { if (swipe) { swipe = null; document.body.classList.remove('arrastando'); const el = alvoSwipe(); if (el) { el.style.transform = ''; el.style.opacity = ''; } } });
 let rodaAcum = 0, rodaPausa = 0;
 document.addEventListener('wheel', ev => {
-  if (!['tarefas', 'calendario'].includes(vista) || $('#modalBg').classList.contains('on')) return;
+  if (!['tarefas', 'calendario'].includes(vista) || $('#modalBg').classList.contains('on') || (vista === 'tarefas' && tFiltro.modo === 'projetos')) return;
   if (Math.abs(ev.deltaX) <= Math.abs(ev.deltaY) * 1.2) return;
   if (Date.now() < rodaPausa) return;
   rodaAcum += ev.deltaX;
   if (Math.abs(rodaAcum) > 140) { navegar(rodaAcum > 0 ? 1 : -1); rodaAcum = 0; rodaPausa = Date.now() + 700; }
 }, { passive: true });
 document.addEventListener('keydown', ev => {
-  if ($('#modalBg').classList.contains('on') || ev.target.matches('input,textarea,select')) return;
+  if ($('#modalBg').classList.contains('on') || ev.target.matches('input,textarea,select') || (vista === 'tarefas' && tFiltro.modo === 'projetos')) return;
   if (ev.key === 'ArrowLeft') navegar(-1); else if (ev.key === 'ArrowRight') navegar(1);
 });
 
@@ -3105,7 +3155,7 @@ function telaLogin(msg) {
   migrarProjetos();
   migrarCores();
   repararVinculos();
-  if (!D.config.etapasV1) { D.config.etapas = JSON.parse(JSON.stringify(ETAPAS_PADRAO)); D.config.etapasV1 = true; salvar(); }
+  if (!D.config.etapasV2) { const ant = (D.config.etapas || {}).sienge_mensal; D.config.etapas = { semanal: [], mensal: Array.isArray(ant) && ant.length ? ant : ETAPAS_PADRAO.mensal }; D.config.etapasV1 = D.config.etapasV2 = true; salvar(); }
   gRestaurar();
   render();
   if (gOk()) gCarregarCalendarios().then(() => { faixaEventos = ''; render(); }).catch(e => { erroGoogle = e.message; });
