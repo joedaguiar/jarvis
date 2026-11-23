@@ -1484,7 +1484,7 @@ function cartaoCiclo(p, ciclo) {
   const h = hoje0(), hs = ymd(h), c = ctxFer(p), cor = corEmpresa(p), tg = tagProjeto(p), pt = partesProjeto(p);
   let pk, rot, reu, cob = null, ets = [], ag;
   if (ciclo === 'semanal') {
-    const seg = segundaDe(h); pk = 'S:' + ymd(seg); rot = 'Semana de ' + fmtData(ymd(seg));
+    const seg = segundaDe(h); pk = 'S:' + ymd(seg); rot = `${pad(seg.getDate())}/${pad(seg.getMonth() + 1)} – ${pad(addDays(seg, 4).getDate())}/${pad(addDays(seg, 4).getMonth() + 1)}`;
     reu = dataReuniao(p.id, pk); cob = !reu && mensalNaSemana(p, seg);
     const l = tarefasControle(p, seg, addDays(seg, 6)).filter(x => x.pkey === pk); ag = l.find(x => x.acao === 'agendar'); ets = l.filter(x => x.acao !== 'agendar');
   } else {
@@ -1494,7 +1494,7 @@ function cartaoCiclo(p, ciclo) {
     // ciclo vigente: do dia 20 do mês até o dia 20 do mês seguinte (o que já foi feito continua visível para desmarcar)
     const mv = h.getDate() >= 20 ? new Date(h.getFullYear(), h.getMonth(), 1) : new Date(h.getFullYear(), h.getMonth() - 1, 1), pkV = `M:${mv.getFullYear()}-${pad(mv.getMonth() + 1)}`;
     pk = pend[0] && pend[0] < pkV ? pend[0] : pkV;
-    rot = 'Medição de ' + nomeMes(pk.slice(2)); reu = dataReuniao(p.id, pk);
+    rot = (() => { const [y, mm] = pk.slice(2).split('-'); return MESES[+mm - 1].slice(0, 3).replace(/^./, c => c.toUpperCase()) + '/' + y.slice(2); })(); reu = dataReuniao(p.id, pk);
     const doMes = l.filter(x => x.pkey === pk); ag = doMes.find(x => x.acao === 'agendar'); ets = doMes.filter(x => x.acao !== 'agendar');
   }
   const r = ctlPeek(p.id, pk), feitoFora = !reu && r.feitos.agendar;
@@ -1505,7 +1505,7 @@ function cartaoCiclo(p, ciclo) {
   else if (feitoFora) st = `<div class="pj-reu ok" data-agendar="${p.id}|${pk}"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}</small><b>Agendada por fora</b></div>`;
   else { const cedo = ciclo === 'mensal' && hs < d20; st = `<div class="pj-reu ${cedo ? 'cedo' : ''}"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}</small><b>${cedo ? 'Agendar a partir de ' + fmtData(d20) : 'A agendar'}</b><button class="btn sm ${cedo ? '' : 'pri'}" data-agendar="${p.id}|${pk}">Agendar</button></div>`; }
   const etHtml = ciclo === 'mensal' ? (ets.length
-      ? ets.sort((a, b) => a.data.localeCompare(b.data)).map(x => `<label class="pj-et ${x.feito ? 'done' : ''} ${!x.feito && x.data < hs ? 'late' : ''}"><input type="checkbox" data-ctl="${p.id}|${x.pkey}|${x.tkey}" ${x.feito ? 'checked' : ''}><span>${esc(x.titulo)}</span><em>${fmtData(x.data)}</em></label>`).join('')
+      ? ets.sort((a, b) => a.data.localeCompare(b.data)).map(x => `<label class="pj-et ${x.feito ? 'done' : ''} ${!x.feito && !x.semData && x.data < hs ? 'late' : ''}"><input type="checkbox" data-ctl="${p.id}|${x.pkey}|${x.tkey}" ${x.feito ? 'checked' : ''}><span>${esc(x.titulo)}</span><em>${x.semData ? 'aguarda a reunião' : fmtData(x.data)}</em></label>`).join('')
       : etapas('mensal').map(e => `<div class="pj-et prev"><input type="checkbox" disabled><span>${esc(e.nome)}</span><em>${rotuloDias(+e.dias || 0)}</em></div>`).join('')) : '';
   return `<div class="pj-ciclo"><div class="pj-per"><b>${ciclo === 'semanal' ? 'Semanal' : 'Mensal'}</b> · ${esc(rot)}</div>${st}${etHtml}</div>`;
 }
@@ -2424,7 +2424,7 @@ const ROTINAS = [
 ];
 const ETAPAS_PADRAO = {
   semanal: [],
-  mensal: [{ id: 'relatorios', nome: 'Enviar os relatórios', dias: 0 }]
+  mensal: [{ id: 'relatorios', nome: 'Relatórios', dias: 0 }]
 };
 function etapas(k) { if (k !== 'semanal') k = 'mensal'; const e = (D.config.etapas || {})[k]; return Array.isArray(e) ? e : ETAPAS_PADRAO[k] || []; }
 function deslocUteis(d, n, c) { if (!n) return d; let x = d, k = 0; const st = n > 0 ? 1 : -1; for (let i = 0; i < 60 && k < Math.abs(n); i++) { x = addDays(x, st); if (ehUtil(x, c)) k++; } return x; }
@@ -2473,11 +2473,11 @@ function tarefasControle(p, ini, fim) {
     for (let m = new Date(m0.getFullYear(), m0.getMonth(), 1); m <= mFim; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
       const ym = `${m.getFullYear()}-${pad(m.getMonth() + 1)}`, pkey = 'M:' + ym, r = ctlPeek(p.id, pkey), reu = dataReuniao(p.id, pkey);
       const d20 = new Date(m.getFullYear(), m.getMonth(), 20);
-      if (d20 < desde && !reu) continue;
+      if (new Date(m.getFullYear(), m.getMonth() + 1, 20) < desde && !reu) continue; // ciclo do mês vai do dia 20 ao dia 20 seguinte
       add(pkey, 'agendar', `Agendar a reunião mensal (${nomeMes(ym)})`, d20, { acao: 'agendar', ciclo: 'mensal', feito: !!reu || !!r.feitos.agendar, reuniao: reu, alerta: true, periodo: nomeMes(ym) });
-      if (reu) {
-        const dReu = parseYmd(reu.data);
-        etapas('mensal').forEach(e => add(pkey, e.id, e.nome, deslocUteis(dReu, +e.dias || 0, c), { etapa: true, ciclo: 'mensal', mensal: nomeMes(ym), reuniao: reu }));
+      { // entregas do mensal: com reunião, contam da data dela; sem reunião, ficam no último dia útil do mês (sem data definida)
+        const dReu = reu ? parseYmd(reu.data) : (() => { let d = new Date(m.getFullYear(), m.getMonth() + 1, 0); while (!ehUtil(d, c)) d = addDays(d, -1); return d; })();
+        etapas('mensal').forEach(e => add(pkey, e.id, e.nome, reu ? deslocUteis(dReu, +e.dias || 0, c) : dReu, { etapa: true, ciclo: 'mensal', mensal: nomeMes(ym), reuniao: reu, semData: !reu }));
       }
     }
   }
@@ -3218,6 +3218,12 @@ function telaLogin(msg) {
   migrarProjetos();
   migrarCores();
   repararVinculos();
+  if (!D.config.vinculosZerados1) {
+    Object.values(D.controle || {}).forEach(m => Object.values(m).forEach(r => { delete r.reuniaoItem; delete r.reuniaoData; delete r.reuniaoHora; if (r.feitos) delete r.feitos.agendar; }));
+    D.itens.forEach(it => { delete it.controle; delete it.controlesExtras; });
+    D.config.vinculosZerados1 = true; salvar();
+  }
+  if (!D.config.relatoriosNome1) { const l = (D.config.etapas || {}).mensal; if (Array.isArray(l)) l.forEach(e => { if (/^enviar os relat[óo]rios$/i.test(e.nome)) e.nome = 'Relatórios'; }); D.config.relatoriosNome1 = true; salvar(); }
   if (!D.config.etapasV2) { const ant = (D.config.etapas || {}).sienge_mensal; D.config.etapas = { semanal: [], mensal: Array.isArray(ant) && ant.length ? ant : ETAPAS_PADRAO.mensal }; D.config.etapasV1 = D.config.etapasV2 = true; salvar(); }
   gRestaurar();
   render();
