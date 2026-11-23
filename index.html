@@ -1320,7 +1320,7 @@ function linha(x, opts = {}) {
 /* ================= views ================= */
 let vista = 'calendario', refSemana = domingo(hoje0()), refCal = hoje0(), modoCal = 'semana', selProj = null;
 const TITULOS = { painel: 'Painel', tarefas: 'Tarefas', hoje: 'Painel', semana: 'Semana', calendario: 'Calendário', projetos: 'Configurações', contatos: 'Configurações', config: 'Configurações' };
-function irPara(v) { vista = v; render(); }
+function irPara(v) { if (!v) return; vista = v; render(); }
 function render() {
   if (drag && drag.ativo) return;
   _corRN = undefined;
@@ -2124,7 +2124,7 @@ document.addEventListener('click', async ev => {
   const cv = t.closest('[data-convite]'); if (cv) { ev.preventDefault(); const it = D.itens.find(i => i.id === cv.dataset.convite); return copiarTexto(textoConvite(it.titulo, it.data, it.hora, it.duracao, it.linkReuniao), 'Convite copiado.'); }
   const ce = t.closest('[data-convite-ev]'); if (ce) { const e = modalEvento._e, sd = e.start.dateTime.slice(0, 10); return copiarTexto(textoConvite(e.subject, sd, e.isAllDay ? '' : e.start.dateTime.slice(11, 16), hm2min(e.end.dateTime.slice(11, 16)) - hm2min(e.start.dateTime.slice(11, 16)), e.onlineMeeting.joinUrl), 'Convite copiado.'); }
   if (t.matches('#modalBg')) return fecharModal();
-  const nav = t.closest('#nav button, #nav2 button, .abas button'); if (nav) return irPara(nav.dataset.v);
+  const nav = t.closest('#nav button, #nav2 button, .abas button[data-v]'); if (nav) return irPara(nav.dataset.v);
   const vi = t.closest('[data-v-ir]'); if (vi) return irPara(vi.dataset.vIr);
   const conc = t.closest('[data-conc]');
   if (conc) {
