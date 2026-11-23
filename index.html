@@ -219,7 +219,14 @@ body.mini #outlookStatus .dot{margin:3px}
 .pj-sec{display:flex;align-items:center;gap:8px;margin:6px 2px 10px;font-size:14px}.pj-sec span{font-size:11px;background:var(--papel);border:1px solid var(--line);border-radius:999px;padding:0 8px;color:var(--muted)}
 .pjgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));column-gap:12px;row-gap:12px;margin-bottom:22px}
 .pjgrid .pjcol{display:grid;grid-row:span 4;grid-template-rows:subgrid;row-gap:0;align-content:start}
-.pjgrid .pjcol>.pj-ciclo{align-self:stretch;justify-content:flex-start;padding:8px 0}
+.pjgrid .pjcol>.thead{display:flex;align-items:center;gap:8px;height:48px;flex-wrap:nowrap;margin-bottom:12px}
+.thead .tfiltros{padding:0!important;margin:0!important;background:none!important;box-shadow:none!important}.thead .tfiltros input,.thead .tfiltros select{height:36px;box-sizing:border-box}
+.thead .tabs-t{margin:0 8px 0 0;flex:none}.thead .tabs-t button{min-width:104px}
+.thead .lbl{white-space:nowrap}
+.thead .tfiltros{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;min-width:0}
+.thead .tfiltros #tfQ{min-width:120px;width:160px}.thead .tfiltros select{max-width:190px}
+@media (max-width:900px){.thead{flex-wrap:wrap;height:auto}}
+.pj-ciclo{align-self:stretch;justify-content:flex-start;padding:8px 0}
 .pjgrid .pjcol>header{padding-bottom:4px}
 .pj-vazio .pj-per{opacity:.6}
 .pj-et.u-neutro{background:transparent}
@@ -1494,7 +1501,7 @@ function vPainel() {
 }
 function tituloAgendaCurto(x) { const t = String(x.titulo || ''); return t.length > 48 ? t.slice(0, 46) + '…' : t; }
 let tFiltro = { proj: '', cat: '', q: '', rotinas: false, modo: (() => { try { return localStorage.getItem('tModo2') || 'projetos'; } catch { return 'semana'; } })() };
-function abasTarefas() { return `<div class="abas" style="margin:0 8px 0 0"><button class="${tFiltro.modo !== 'projetos' ? 'on' : ''}" data-tmodo="semana">Semana</button><button class="${tFiltro.modo === 'projetos' ? 'on' : ''}" data-tmodo="projetos">Por projeto</button></div>`; }
+function abasTarefas() { return `<div class="abas tabs-t"><button class="${tFiltro.modo === 'projetos' ? 'on' : ''}" data-tmodo="projetos">Por projeto</button><button class="${tFiltro.modo !== 'projetos' ? 'on' : ''}" data-tmodo="semana">Semana</button></div>`; }
 // urgência visual: atrasado (vermelho), hoje (laranja), esta semana (amarelo), depois (sem fundo, cinza)
 function urgencia(d) {
   const h = hoje0(), hs = ymd(h); if (!d) return 'longe';
@@ -1550,7 +1557,7 @@ function vTarefasProjetos() {
   const chave = p => { const pt = partesProjeto(p); return [normTxt(pt.construtora || pt.obra), normTxt(pt.obra)]; };
   const ps = D.projetos.filter(p => p.categoria !== 'pessoal' && !['jf', 'sigo', 'pessoal'].includes(chaveEmpresa(p.areaId)) && ((CATEGORIAS[p.categoria] && (CATEGORIAS[p.categoria].semanal || CATEGORIAS[p.categoria].dia20)) || pontuaisDe(p).length))
     .sort((a, b) => { const x = chave(a), y = chave(b); return x[0].localeCompare(y[0], 'pt-BR') || x[1].localeCompare(y[1], 'pt-BR'); });
-  return `<div class="cal-head">${abasTarefas()}<span class="lbl">Entregas por projeto</span><span style="flex:1"></span><span class="leg"><i class="u-late"></i>atrasado<i class="u-hoje"></i>hoje<i class="u-semana"></i>esta semana<i class="u-longe"></i>depois</span></div>
+  return `<div class="cal-head thead">${abasTarefas()}<span class="lbl">Entregas por projeto</span><span style="flex:1"></span><span class="leg"><i class="u-late"></i>atrasado<i class="u-hoje"></i>hoje<i class="u-semana"></i>esta semana<i class="u-longe"></i>depois</span></div>
     ${ps.length ? `<div class="pjgrid">${ps.map(cartaoObra).join('')}</div>` : '<div class="empty">Nenhuma obra com ciclo semanal ou mensal. Defina a categoria em Configurações → Empresas e projetos.</div>'}`;
 }
 function vTarefas() {
@@ -1588,7 +1595,7 @@ function vTarefas() {
     + dias.map(x => { const estreito = x.dd.getDay() % 6 === 0 && !x.l.length, ab = x.l.filter(c => !c.feito).length;
       return col((x.d === hs ? 'hoje' : '') + (estreito ? ' estreita' : ''), estreito ? `<b class="dw">${DIAS[x.dd.getDay()]}</b><b class="dn">${x.dd.getDate()}</b>` : `<em class="dw"><b>${DIAS_L[x.dd.getDay()].replace('-feira', '')}</b> ${x.dd.getDate()}/${pad(x.dd.getMonth() + 1)}</em>`, estreito ? 0 : ab, x.l.map(card).join(''), x.d); }).join('')
     + (semData.length ? col('', 'Sem data', semData.length, semData.map(card).join('')) : '');
-  return `<div class="cal-head">${abasTarefas()}<button class="btn" data-acao="semAnt">‹</button><button class="btn" data-acao="semHoje">Hoje</button><button class="btn" data-acao="semProx">›</button>
+  return `<div class="cal-head thead">${abasTarefas()}<button class="btn" data-acao="semAnt">‹</button><button class="btn" data-acao="semHoje">Hoje</button><button class="btn" data-acao="semProx">›</button>
       <span class="lbl">${ini.getDate()} ${MESES[ini.getMonth()].slice(0, 3)} – ${fimS.getDate()} ${MESES[fimS.getMonth()].slice(0, 3)} ${fimS.getFullYear()}</span><span style="flex:1"></span>
       <div class="tfiltros"><input id="tfQ" placeholder="Buscar…" value="${esc(tFiltro.q)}">
       <select id="tfProj"><option value="">Todos os projetos</option>${optsProjetos(tFiltro.proj)}</select>
@@ -2522,7 +2529,7 @@ function controleEntre(ini, fim) {
 // pendências até hoje (atrasadas + de hoje + alertas do dia 20 ativos)
 function pendenciasControle() {
   const h = hoje0();
-  return D.projetos.filter(p => CATEGORIAS[p.categoria]).flatMap(p => tarefasControle(p, parseYmd(p.controleDesde || ymd(segundaDe(h))), h)).filter(x => !x.feito);
+  return D.projetos.filter(p => CATEGORIAS[p.categoria]).flatMap(p => tarefasControle(p, addDays(h, -75), h)).filter(x => !x.feito);
 }
 function linhaCtl(x, opts = {}) {
   const hs = ymd(hoje0()), late = x.data < hs, cor = corCtl(x.p);
