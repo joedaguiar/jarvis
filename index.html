@@ -1490,12 +1490,12 @@ function vPainel() {
 function tituloAgendaCurto(x) { const t = String(x.titulo || ''); return t.length > 48 ? t.slice(0, 46) + '…' : t; }
 let tFiltro = { proj: '', cat: '', q: '', rotinas: false, modo: (() => { try { return localStorage.getItem('tModo2') || 'projetos'; } catch { return 'semana'; } })() };
 function abasTarefas() { return `<div class="abas" style="margin:0 8px 0 0"><button class="${tFiltro.modo !== 'projetos' ? 'on' : ''}" data-tmodo="semana">Semana</button><button class="${tFiltro.modo === 'projetos' ? 'on' : ''}" data-tmodo="projetos">Por projeto</button></div>`; }
-// urgência visual: atrasado (vermelho), hoje (laranja), esta semana (amarelo), próxima semana (branco), depois (cinza)
+// urgência visual: atrasado (vermelho), hoje (laranja), esta semana (amarelo), depois (sem fundo, cinza)
 function urgencia(d) {
   const h = hoje0(), hs = ymd(h); if (!d) return 'longe';
   if (d < hs) return 'late'; if (d === hs) return 'hoje';
   const fimSem = ymd(addDays(segundaDe(h), 6)), fimProx = ymd(addDays(segundaDe(h), 13));
-  return d <= fimSem ? 'semana' : d <= fimProx ? 'prox' : 'longe';
+  return d <= fimSem ? 'semana' : 'longe'; // depois desta semana: sem fundo
 }
 // uma coluna por projeto: semanal (reunião da semana) e mensal (medição + entregas)
 function cartaoCiclo(p, ciclo) {
@@ -1545,7 +1545,7 @@ function vTarefasProjetos() {
   const chave = p => { const pt = partesProjeto(p); return [normTxt(pt.construtora || pt.obra), normTxt(pt.obra)]; };
   const ps = D.projetos.filter(p => p.categoria !== 'pessoal' && ((CATEGORIAS[p.categoria] && (CATEGORIAS[p.categoria].semanal || CATEGORIAS[p.categoria].dia20)) || pontuaisDe(p).length))
     .sort((a, b) => { const x = chave(a), y = chave(b); return x[0].localeCompare(y[0], 'pt-BR') || x[1].localeCompare(y[1], 'pt-BR'); });
-  return `<div class="cal-head">${abasTarefas()}<span class="lbl">Entregas por projeto</span><span style="flex:1"></span><span class="leg"><i class="u-late"></i>atrasado<i class="u-hoje"></i>hoje<i class="u-semana"></i>esta semana<i class="u-prox"></i>próxima semana<i class="u-longe"></i>depois</span></div>
+  return `<div class="cal-head">${abasTarefas()}<span class="lbl">Entregas por projeto</span><span style="flex:1"></span><span class="leg"><i class="u-late"></i>atrasado<i class="u-hoje"></i>hoje<i class="u-semana"></i>esta semana<i class="u-longe"></i>depois</span></div>
     ${ps.length ? `<div class="pjgrid">${ps.map(cartaoObra).join('')}</div>` : '<div class="empty">Nenhuma obra com ciclo semanal ou mensal. Defina a categoria em Configurações → Empresas e projetos.</div>'}`;
 }
 function vTarefas() {
