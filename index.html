@@ -221,6 +221,17 @@ body.mini #outlookStatus .dot{margin:3px}
 .pjcol{background:var(--papel);border-radius:18px;padding:12px;box-shadow:var(--sombra);border-top:4px solid var(--c);display:flex;flex-direction:column;gap:6px}
 .pjcol header{display:flex;gap:8px;align-items:center}.pjcol header i{width:10px;height:10px;border-radius:50%;flex:none}
 .pjcol header b{display:block;font-size:14px;line-height:1.2}.pjcol header small{color:var(--muted);font-size:11.5px}
+.u-late{background:#fde4e4!important}.pj-reu.u-late small{color:#b91c1c;font-weight:700}.pj-et.u-late em{color:#b91c1c;font-weight:700}
+.u-hoje{background:var(--coral-soft)!important}.pj-reu.u-hoje small,.pj-et.u-hoje em{color:var(--coral);font-weight:700}
+.u-semana{background:#fdf3c4!important}.pj-et.u-semana em{color:#92400e;font-weight:600}
+.u-prox{background:#fff!important}
+.pj-reu.u-longe{background:transparent!important;box-shadow:inset 0 0 0 1px var(--line)}.u-longe{background:transparent!important}.pj-et.u-longe span,.pj-et.u-longe em,.pj-reu.u-longe b{color:var(--muted)}
+.pj-et.u-late,.pj-et.u-hoje,.pj-et.u-semana,.pj-et.u-prox{margin:1px 0}
+.pj-pt span{cursor:pointer}
+.pj-add{border:0;background:none;cursor:pointer;color:var(--salvia-esc);font-size:16px;line-height:1;margin-left:auto;padding:0 4px;border-radius:6px}.pj-add:hover{background:#fff}
+.pj-per{display:flex;align-items:center;gap:4px}
+.leg i.u-late{box-shadow:inset 0 0 0 1.5px #f87171}.leg i.u-hoje{box-shadow:inset 0 0 0 1.5px var(--coral)}.leg i.u-semana{box-shadow:inset 0 0 0 1.5px #eab308}.leg i.u-prox{box-shadow:inset 0 0 0 1.5px #cbd5e1}.leg i.u-longe{box-shadow:inset 0 0 0 1.5px #e2e8f0}
+.leg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);flex-wrap:wrap}.leg i{width:14px;height:14px;border-radius:5px;display:inline-block;margin-left:8px;box-shadow:inset 0 0 0 1px var(--line)}
 .pj-ciclo{display:flex;flex-direction:column;gap:6px}.pj-ciclo+.pj-ciclo{border-top:1px dashed var(--line);padding-top:8px;margin-top:2px}
 .pj-per{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-top:2px}.pj-per b{color:var(--ink)}
 .pj-reu{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--coral-soft);border-radius:12px;padding:7px 10px}
@@ -1477,8 +1488,15 @@ function vPainel() {
     </div></div>`;
 }
 function tituloAgendaCurto(x) { const t = String(x.titulo || ''); return t.length > 48 ? t.slice(0, 46) + '…' : t; }
-let tFiltro = { proj: '', cat: '', q: '', rotinas: false, modo: (() => { try { return localStorage.getItem('tModo') || 'semana'; } catch { return 'semana'; } })() };
+let tFiltro = { proj: '', cat: '', q: '', rotinas: false, modo: (() => { try { return localStorage.getItem('tModo2') || 'projetos'; } catch { return 'semana'; } })() };
 function abasTarefas() { return `<div class="abas" style="margin:0 8px 0 0"><button class="${tFiltro.modo !== 'projetos' ? 'on' : ''}" data-tmodo="semana">Semana</button><button class="${tFiltro.modo === 'projetos' ? 'on' : ''}" data-tmodo="projetos">Por projeto</button></div>`; }
+// urgência visual: atrasado (vermelho), hoje (laranja), esta semana (amarelo), próxima semana (branco), depois (cinza)
+function urgencia(d) {
+  const h = hoje0(), hs = ymd(h); if (!d) return 'longe';
+  if (d < hs) return 'late'; if (d === hs) return 'hoje';
+  const fimSem = ymd(addDays(segundaDe(h), 6)), fimProx = ymd(addDays(segundaDe(h), 13));
+  return d <= fimSem ? 'semana' : d <= fimProx ? 'prox' : 'longe';
+}
 // uma coluna por projeto: semanal (reunião da semana) e mensal (medição + entregas)
 function cartaoCiclo(p, ciclo) {
   const h = hoje0(), hs = ymd(h), c = ctxFer(p), cor = corEmpresa(p), tg = tagProjeto(p), pt = partesProjeto(p);
@@ -1503,23 +1521,31 @@ function cartaoCiclo(p, ciclo) {
   if (reu) st = `<div class="pj-reu ok" data-agendar="${p.id}|${pk}" title="Remarcar, desvincular ou desfazer"><small>${ciclo === 'semanal' ? (reu.it && reu.it.controle && reu.it.controle.split('|')[1].startsWith('M:') ? 'Reunião da semana · junto com a mensal' : 'Reunião da semana') : 'Reunião de medição'}</small><b>${fmtData(reu.data)}${reu.hora ? ' · ' + reu.hora : ''}</b>${reu.it && reu.it.linkReuniao ? '<span class="tag">online</span>' : ''}</div>`;
   else if (cob) st = `<div class="pj-reu ok"><small>Reunião da semana</small><b>Coberta pela mensal (${fmtData(cob.data)})</b></div>`;
   else if (feitoFora) st = `<div class="pj-reu ok" data-agendar="${p.id}|${pk}"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}</small><b>Agendada por fora</b></div>`;
-  else { const cedo = ciclo === 'mensal' && hs < d20; st = `<div class="pj-reu ${cedo ? 'cedo' : ''}"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}</small><b>${cedo ? 'Agendar a partir de ' + fmtData(d20) : 'A agendar'}</b><button class="btn sm ${cedo ? '' : 'pri'}" data-agendar="${p.id}|${pk}">Agendar</button></div>`; }
+  else { const cedo = ciclo === 'mensal' && hs < d20, u = urgencia(ag ? ag.data : (d20 || hs)); st = `<div class="pj-reu u-${u}"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}${u === 'late' ? ' · atrasado' : u === 'hoje' ? ' · hoje' : ''}</small><b>${cedo ? 'Agendar a partir de ' + fmtData(d20) : 'A agendar'}</b><button class="btn sm ${u === 'late' || u === 'hoje' ? 'pri' : ''}" data-agendar="${p.id}|${pk}">Agendar</button></div>`; }
   const etHtml = ciclo === 'mensal' ? (ets.length
-      ? ets.sort((a, b) => a.data.localeCompare(b.data)).map(x => `<label class="pj-et ${x.feito ? 'done' : ''} ${!x.feito && !x.semData && x.data < hs ? 'late' : ''}"><input type="checkbox" data-ctl="${p.id}|${x.pkey}|${x.tkey}" ${x.feito ? 'checked' : ''}><span>${esc(x.titulo)}</span><em>${x.semData ? 'aguarda a reunião' : fmtData(x.data)}</em></label>`).join('')
+      ? ets.sort((a, b) => a.data.localeCompare(b.data)).map(x => `<label class="pj-et ${x.feito ? 'done' : 'u-' + (x.semData ? 'longe' : urgencia(x.data))}"><input type="checkbox" data-ctl="${p.id}|${x.pkey}|${x.tkey}" ${x.feito ? 'checked' : ''}><span>${esc(x.titulo)}</span><em>${x.semData ? 'aguarda a reunião' : fmtData(x.data)}</em></label>`).join('')
       : etapas('mensal').map(e => `<div class="pj-et prev"><input type="checkbox" disabled><span>${esc(e.nome)}</span><em>${rotuloDias(+e.dias || 0)}</em></div>`).join('')) : '';
   return `<div class="pj-ciclo"><div class="pj-per"><b>${ciclo === 'semanal' ? 'Semanal' : 'Mensal'}</b> · ${esc(rot)}</div>${st}${etHtml}</div>`;
+}
+function pontuaisDe(p) {
+  const cons = partesProjeto(p).construtora;
+  return D.itens.filter(i => i.demanda && i.data && !i.concluidas[i.data] && (i.projetoId === p.id || (cons && i.projetoId === 'c:' + cons))).sort((a, b) => a.data.localeCompare(b.data));
 }
 function cartaoObra(p) {
   const cat = CATEGORIAS[p.categoria], cor = corEmpresa(p), tg = tagProjeto(p), pt = partesProjeto(p);
   const bloco = c => { try { return cartaoCiclo(p, c); } catch (e) { console.warn('cartão', p.nome, e); return '<div class="hint">Não foi possível montar este ciclo.</div>'; } };
-  return `<section class="pjcol" style="--c:${cor}"><header><i style="background:${tg.cor}"></i><div><b>${esc(pt.obra)}</b><small>${esc(pt.construtora || cat.nome)}</small></div></header>
-    ${cat.semanal ? bloco('semanal') : ''}${cat.dia20 ? bloco('mensal') : ''}</section>`;
+  const temCiclo = cat && (cat.semanal || cat.dia20);
+  const pont = pontuaisDe(p), MAX = 6;
+  const pHtml = `<div class="pj-ciclo"><div class="pj-per"><b>Pontuais</b>${pont.length ? ' · ' + pont.length : ''}<button class="lnk pj-add" data-pontual="${p.id}" title="Nova pendência pontual">+</button></div>
+    ${pont.length ? pont.slice(0, MAX).map(i => `<div class="pj-et pj-pt u-${urgencia(i.data)}"><input type="checkbox" data-conc="${i.id}|${i.data}"><span data-item="${i.id}">${esc(i.titulo)}${String(i.projetoId).startsWith('c:') ? ` <small class="hint">(${esc(i.projetoId.slice(2))})</small>` : ''}</span><em>${fmtData(i.data)}</em></div>`).join('') + (pont.length > MAX ? `<div class="hint" style="padding:2px 4px">+ ${pont.length - MAX} pendência(s)</div>` : '') : '<div class="hint" style="padding:2px 4px">Nenhuma pendência.</div>'}</div>`;
+  return `<section class="pjcol" style="--c:${cor}"><header><i style="background:${tg.cor}"></i><div><b>${esc(pt.obra)}</b><small>${esc(pt.construtora || (cat ? cat.nome : (area(p.areaId) || {}).nome || ''))}</small></div></header>
+    ${temCiclo && cat.semanal ? bloco('semanal') : ''}${temCiclo && cat.dia20 ? bloco('mensal') : ''}${pHtml}</section>`;
 }
 function vTarefasProjetos() {
   const chave = p => { const pt = partesProjeto(p); return [normTxt(pt.construtora || pt.obra), normTxt(pt.obra)]; };
-  const ps = D.projetos.filter(p => CATEGORIAS[p.categoria] && (CATEGORIAS[p.categoria].semanal || CATEGORIAS[p.categoria].dia20))
+  const ps = D.projetos.filter(p => p.categoria !== 'pessoal' && ((CATEGORIAS[p.categoria] && (CATEGORIAS[p.categoria].semanal || CATEGORIAS[p.categoria].dia20)) || pontuaisDe(p).length))
     .sort((a, b) => { const x = chave(a), y = chave(b); return x[0].localeCompare(y[0], 'pt-BR') || x[1].localeCompare(y[1], 'pt-BR'); });
-  return `<div class="cal-head">${abasTarefas()}<span class="lbl">Entregas por projeto</span><span style="flex:1"></span><span class="hint">Semanal: agendar na segunda, reunião no fim da semana · Mensal: agendar a partir do dia 20, relatórios junto com a reunião</span></div>
+  return `<div class="cal-head">${abasTarefas()}<span class="lbl">Entregas por projeto</span><span style="flex:1"></span><span class="leg"><i class="u-late"></i>atrasado<i class="u-hoje"></i>hoje<i class="u-semana"></i>esta semana<i class="u-prox"></i>próxima semana<i class="u-longe"></i>depois</span></div>
     ${ps.length ? `<div class="pjgrid">${ps.map(cartaoObra).join('')}</div>` : '<div class="empty">Nenhuma obra com ciclo semanal ou mensal. Defina a categoria em Configurações → Empresas e projetos.</div>'}`;
 }
 function vTarefas() {
@@ -2154,7 +2180,8 @@ document.addEventListener('click', async ev => {
   const sga = t.closest('[data-sugadd]'); if (sga) { const sel = document.querySelector(`[data-sugemp="${CSS.escape(sga.dataset.sugadd)}"]`); if (addContato(sga.dataset.sugnome, sga.dataset.sugadd, sel ? sel.value : '', '')) { toast('Contato salvo.'); render(); } return; }
   const etx = t.closest('[data-etx]'); if (etx) { const [k, i] = etx.dataset.etx.split('|'), l = JSON.parse(JSON.stringify(etapas(k))); l.splice(+i, 1); D.config.etapas = Object.assign({}, D.config.etapas, { [k]: l }); salvar(); return render(); }
   const eta = t.closest('[data-eta]'); if (eta) { const k = eta.dataset.eta, l = JSON.parse(JSON.stringify(etapas(k))); l.push({ id: 'e' + uid().slice(0, 6), nome: 'Nova etapa', dias: 0 }); D.config.etapas = Object.assign({}, D.config.etapas, { [k]: l }); salvar(); render(); const ins = $$(`[data-etn^="${k}|"]`); if (ins.length) { ins[ins.length - 1].focus(); ins[ins.length - 1].select(); } return; }
-  const tmo = t.closest('[data-tmodo]'); if (tmo) { tFiltro.modo = tmo.dataset.tmodo; try { localStorage.setItem('tModo', tFiltro.modo); } catch { } return render(); }
+  const pnt = t.closest('[data-pontual]'); if (pnt) return modalDemanda(null, pnt.dataset.pontual);
+  const tmo = t.closest('[data-tmodo]'); if (tmo) { tFiltro.modo = tmo.dataset.tmodo; try { localStorage.setItem('tModo2', tFiltro.modo); } catch { } return render(); }
   const td = t.closest('.tadd[data-tdia]'); if (td) return modalDemanda(null, tFiltro.proj || '', { data: td.dataset.tdia });
   const nd = t.closest('[data-novo-data]'); if (nd) return novoItem({ data: nd.dataset.novoData });
   const nt = t.closest('[data-novo-tipo]'); if (nt) return novoItem(Object.assign({ tipo: nt.dataset.novoTipo }, JSON.parse(nt.dataset.ctx)));
