@@ -1550,17 +1550,18 @@ function cartaoObra(p) {
   const pont = pontuaisDe(p), MAX = 6;
   const pHtml = `<div class="pj-ciclo"><div class="pj-per"><b>Pontuais</b>${pont.length ? ' · ' + pont.length : ''}<button class="lnk pj-add" data-pontual="${p.id}" title="Nova pendência pontual">+</button></div>
     ${pont.length ? pont.slice(0, MAX).map(i => `<div class="pj-et pj-pt u-${urgencia(i.data)}"><input type="checkbox" data-conc="${i.id}|${i.data}"><span data-item="${i.id}">${esc(i.titulo)}${String(i.projetoId).startsWith('c:') ? ` <small class="hint">(${esc(i.projetoId.slice(2))})</small>` : ''}</span><em>${fmtData(i.data)}</em></div>`).join('') + (pont.length > MAX ? `<div class="hint" style="padding:2px 4px">+ ${pont.length - MAX} pendência(s)</div>` : '') : '<div class="hint" style="padding:2px 4px">Nenhuma pendência.</div>'}</div>`;
-  const nLinhas = 2 + (temCiclo && cat.semanal ? 1 : 0) + (temCiclo && cat.dia20 ? 1 : 0);
+  const semCiclo = !(temCiclo && cat.semanal), nLinhas = 2 + (temCiclo && cat.semanal ? 1 : 0) + 1;
   return `<section class="pjcol" style="--c:${cor};grid-row:span ${nLinhas}"><header><i style="background:${tg.cor}"></i><div><b>${esc(pt.obra)}</b><small>${esc(pt.construtora || (cat ? cat.nome : (area(p.areaId) || {}).nome || ''))}</small></div></header>
-    ${temCiclo && cat.semanal ? bloco('semanal') : ''}${temCiclo && cat.dia20 ? bloco('mensal') : ''}${pHtml}</section>`;
+    ${temCiclo && cat.semanal ? bloco('semanal') : ''}${temCiclo && cat.dia20 ? bloco('mensal') : '<div class="pj-ciclo pj-vazio"><div class="pj-per"><b>Mensal</b> · ainda não iniciou</div></div>'}${pHtml}</section>`;
 }
 function vTarefasProjetos() {
   const chave = p => { const pt = partesProjeto(p); return [normTxt(pt.construtora || pt.obra), normTxt(pt.obra)]; };
   const ps = D.projetos.filter(p => p.categoria !== 'pessoal' && !['jf', 'sigo', 'pessoal'].includes(chaveEmpresa(p.areaId)) && ((CATEGORIAS[p.categoria] && (CATEGORIAS[p.categoria].semanal || CATEGORIAS[p.categoria].dia20)) || pontuaisDe(p).length))
     .sort((a, b) => { const x = chave(a), y = chave(b); return x[0].localeCompare(y[0], 'pt-BR') || x[1].localeCompare(y[1], 'pt-BR'); });
   return `<div class="cal-head thead">${abasTarefas()}<span class="lbl">Entregas por projeto</span><span style="flex:1"></span><span class="leg"><i class="u-late"></i>atrasado<i class="u-hoje"></i>hoje<i class="u-semana"></i>esta semana<i class="u-longe"></i>depois</span></div>
-    ${ps.length ? (() => { const g = l => { const m = new Map(); l.forEach(p => { const c = CATEGORIAS[p.categoria], k = (c && c.semanal ? 1 : 0) + (c && c.dia20 ? 1 : 0); if (!m.has(k)) m.set(k, []); m.get(k).push(p); }); return [...m.entries()].sort((a, b) => b[0] - a[0]).map(([, l]) => `<div class="pjgrid">${l.map(cartaoObra).join('')}</div>`).join(''); };
-      return g(ps.filter(p => CATEGORIAS[p.categoria] && CATEGORIAS[p.categoria].semanal)) + g(ps.filter(p => !(CATEGORIAS[p.categoria] && CATEGORIAS[p.categoria].semanal))); })() : '<div class="empty">Nenhuma obra com ciclo semanal ou mensal. Defina a categoria em Configurações → Empresas e projetos.</div>'}`;
+    ${ps.length ? (() => { const g = l => l.length ? `<div class="pjgrid">${l.map(cartaoObra).join('')}</div>` : '';
+      const temM = p => !!(CATEGORIAS[p.categoria] && CATEGORIAS[p.categoria].dia20), resto = ps.filter(p => !(CATEGORIAS[p.categoria] && CATEGORIAS[p.categoria].semanal));
+      return g(ps.filter(p => CATEGORIAS[p.categoria] && CATEGORIAS[p.categoria].semanal)) + g(resto.filter(temM).concat(resto.filter(p => !temM(p)))); })() : '<div class="empty">Nenhuma obra com ciclo semanal ou mensal. Defina a categoria em Configurações → Empresas e projetos.</div>'}`;
 }
 function vTarefas() {
   if (tFiltro.modo === 'projetos') return vTarefasProjetos();
