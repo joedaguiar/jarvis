@@ -2125,6 +2125,7 @@ document.addEventListener('click', async ev => {
   if (ctlc) { const [pid, pkey, tkey] = ctlc.dataset.ctl.split('|'); if (tkey === 'agendar') { ctlc.checked = !ctlc.checked; return modalAgendar(pid, pkey); } return marcarCtl(pid, pkey, tkey, ctlc.checked); }
   const ag = t.closest('[data-agendar]'); if (ag) { ev.stopPropagation(); const [pid, pkey] = ag.dataset.agendar.split('|'); return modalAgendar(pid, pkey); }
   const agc = t.closest('[data-agendar-criar]'); if (agc) { const [pid, pkey] = agc.dataset.agendarCriar.split('|'); return agendarCriar(pid, pkey); }
+  const agv = t.closest('[data-agendar-desvincular]'); if (agv) { const [pid, pkey] = agv.dataset.agendarDesvincular.split('|'); return agendarDesvincular(pid, pkey); }
   const agd = t.closest('[data-agendar-desfazer]'); if (agd) { const [pid, pkey] = agd.dataset.agendarDesfazer.split('|'); return agendarDesfazer(pid, pkey); }
   const agf = t.closest('[data-agendar-fora]'); if (agf) { const [pid, pkey] = agf.dataset.agendarFora.split('|'); return agendarFora(pid, pkey); }
   const cp = t.closest('[data-copiar]'); if (cp) { ev.preventDefault(); return copiarTexto(cp.dataset.copiar, 'Link copiado.'); }
@@ -2520,14 +2521,14 @@ function modalAgendar(pid, pkey) {
     <div class="f"><label>Participantes</label>${campoParticipantes('aPart', p.participantes || '')}</div>
     <label class="cb"><input type="checkbox" id="aLink" ${p.linkOnline !== false ? 'checked' : ''}> Criar link de reunião online (Meet / Teams)</label>
     ${(() => { const ir = obrasIrmas(p, sem), cons = partesProjeto(p).construtora; if (!ir.length) return '';
-      const pref = (D.config.reuniaoConjunta || {})[cons] !== false, ja = reu && reu.it ? (reu.it.controlesExtras || []) : null;
-      return `<div class="box"><b style="font-size:12.5px">Mesma reunião para as outras obras da ${esc(cons)}</b>${ir.map(q => { const k = q.id + '|' + pkey, rq = dataReuniao(q.id, pkey), marcado = ja ? ja.includes(k) : pref && !rq;
+      const ja = reu && reu.it ? (reu.it.controlesExtras || []) : [];
+      return `<div class="box"><b style="font-size:12.5px">Mesma reunião para as outras obras da ${esc(cons)}</b>${ir.map(q => { const k = q.id + '|' + pkey, rq = dataReuniao(q.id, pkey), marcado = ja.includes(k);
         return `<label class="cb" style="margin:4px 0 0"><input type="checkbox" class="aIrma" value="${q.id}" ${marcado ? 'checked' : ''}> ${esc(partesProjeto(q).obra)}${rq && !(reu && reu.it && rq.it && rq.it.id === reu.it.id) ? ` <span class="hint">(já tem reunião em ${fmtData(rq.data)})</span>` : ''}</label>`; }).join('')}
         <span class="hint">Marcadas: uma reunião só na agenda, e cada obra tem o seu ciclo e os seus relatórios.</span></div>`; })()}
     ${!sem && CATEGORIAS[p.categoria].semanal ? `<label class="cb"><input type="checkbox" id="aValeSem" ${reu && reu.it && (reu.it.controlesExtras || []).some(k => k.split('|')[1].startsWith('S:')) ? 'checked' : ''}> Esta reunião também vale como a reunião semanal da semana dela</label>` : ''}
     <div class="box aEnt"><b>${sem ? 'Reunião semanal' : 'Reunião mensal (medição)'}: o que vem junto</b><div id="aEntregas"></div></div>
     <p class="hint" id="aAviso"></p>
-    <div class="acts">${reu || ctlPeek(pid, pkey).feitos.agendar ? `<button class="btn dan l" data-agendar-desfazer="${pid}|${pkey}" title="Volta para 'a agendar'${reu && reu.it ? ' e apaga a reunião da agenda' : ''}">Desfazer agendamento</button>` : `<button class="btn l" data-agendar-fora="${pid}|${pkey}" title="Só registra a data; não cria evento">Já agendei por fora</button>`}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-agendar-criar="${pid}|${pkey}">Criar reunião na agenda</button></div>`);
+    <div class="acts">${reu && reu.it ? `<button class="btn l" data-agendar-desvincular="${pid}|${pkey}" title="Tira o vínculo desta obra com a reunião; a reunião continua na agenda">Desvincular</button>` : ''}${reu || ctlPeek(pid, pkey).feitos.agendar ? `<button class="btn dan ${reu && reu.it ? '' : 'l'}" data-agendar-desfazer="${pid}|${pkey}" title="Volta para 'a agendar'${reu && reu.it ? ' e apaga a reunião da agenda' : ''}">Desfazer agendamento</button>` : `<button class="btn l" data-agendar-fora="${pid}|${pkey}" title="Só registra a data; não cria evento">Já agendei por fora</button>`}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-agendar-criar="${pid}|${pkey}">Criar reunião na agenda</button></div>`);
   const lEt = sem ? etapas('semanal') : etapas('mensal');
   const av = () => { const d = $('#aData').value; $('#aAviso').textContent = d && !ehUtil(parseYmd(d), c) ? '⚠ Essa data não é dia útil para esta obra (' + c.uf + ').' : '';
     $('#aEntregas').innerHTML = lEt.length ? lEt.map(e => `<div class="aEnt-r"><span>${d ? fmtData(ymd(deslocUteis(parseYmd(d), +e.dias || 0, c))) : '—'}</span>${esc(e.nome)}<em>${rotuloDias(+e.dias || 0)}</em></div>`).join('') : `<div class="hint">${sem ? 'Semanal não tem entrega de relatório: só a reunião.' : 'Nenhuma entrega configurada (Configurações → Etapas das rotinas).'}</div>`; };
@@ -2540,7 +2541,6 @@ async function agendarCriar(pid, pkey) {
   let it = r.reuniaoItem ? D.itens.find(i => i.id === r.reuniaoItem) : null;
   if (!it) { it = novoItemBase({ tipo: 'reuniao' }); D.itens.push(it); }
   const irmas = $$('.aIrma:checked').map(x => x.value), cons = partesProjeto(p).construtora;
-  if ($$('.aIrma').length) D.config.reuniaoConjunta = Object.assign({}, D.config.reuniaoConjunta, { [cons]: irmas.length > 0 });
   const lista = [pid + '|' + pkey].concat(irmas.map(q => q + '|' + pkey));
   if ($('#aValeSem') && $('#aValeSem').checked) [pid].concat(irmas).forEach(q => { const qp = projeto(q); if (qp && CATEGORIAS[qp.categoria].semanal) lista.push(q + '|S:' + ymd(segundaDe(parseYmd(d)))); });
   desligarReuniao(it); ligarReuniao(it, lista);
@@ -2561,6 +2561,12 @@ function desligarReuniao(it) { // tira esta reunião de todos os ciclos a que es
 function ligarReuniao(it, lista) { // lista: ["pid|pkey", ...]; a primeira é a principal
   lista.forEach(k => { const [a, b] = k.split('|'), r = ctlRec(a, b); r.reuniaoItem = it.id; delete r.reuniaoData; delete r.reuniaoHora; });
   it.controle = lista[0]; it.controlesExtras = lista.slice(1);
+}
+function agendarDesvincular(pid, pkey) {
+  const k = pid + '|' + pkey, r = ctlRec(pid, pkey), it = r.reuniaoItem ? D.itens.find(i => i.id === r.reuniaoItem) : null;
+  delete r.reuniaoItem; delete r.feitos.agendar;
+  if (it) { const l = [it.controle].concat(it.controlesExtras || []).filter(x => x && x !== k); delete it.controle; delete it.controlesExtras; if (l.length) { it.controle = l[0]; it.controlesExtras = l.slice(1); } }
+  fecharModal(); salvar(); render(); toast('Vínculo removido. A reunião continua na agenda.');
 }
 async function agendarDesfazer(pid, pkey) {
   const r = ctlRec(pid, pkey), it = r.reuniaoItem ? D.itens.find(i => i.id === r.reuniaoItem) : null;
