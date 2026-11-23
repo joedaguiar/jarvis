@@ -217,7 +217,12 @@ body.mini #outlookStatus .dot{margin:3px}
 .aEnt{padding:9px 12px}.aEnt b{font-size:12.5px}
 .aEnt-r{display:flex;gap:10px;align-items:baseline;font-size:13px;padding:3px 0}.aEnt-r span{width:96px;flex:none;font-weight:700;font-variant-numeric:tabular-nums}.aEnt-r em{margin-left:auto;font-style:normal;color:var(--muted);font-size:11.5px}
 .pj-sec{display:flex;align-items:center;gap:8px;margin:6px 2px 10px;font-size:14px}.pj-sec span{font-size:11px;background:var(--papel);border:1px solid var(--line);border-radius:999px;padding:0 8px;color:var(--muted)}
-.pjgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:22px}
+.pjgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));column-gap:12px;row-gap:12px;margin-bottom:22px}
+.pjgrid .pjcol{display:grid;grid-row:span 4;grid-template-rows:subgrid;row-gap:0;align-content:start}
+.pjgrid .pjcol>.pj-ciclo{align-self:stretch;justify-content:flex-start;padding:8px 0}
+.pjgrid .pjcol>header{padding-bottom:4px}
+.pj-vazio .pj-per{opacity:.6}
+.pj-et.u-neutro{background:transparent}
 .pjcol{background:var(--papel);border-radius:18px;padding:12px;box-shadow:var(--sombra);border-top:4px solid var(--c);display:flex;flex-direction:column;gap:6px}
 .pjcol header{display:flex;gap:8px;align-items:center}.pjcol header i{width:10px;height:10px;border-radius:50%;flex:none}
 .pjcol header b{display:block;font-size:14px;line-height:1.2}.pjcol header small{color:var(--muted);font-size:11.5px}
@@ -232,7 +237,7 @@ body.mini #outlookStatus .dot{margin:3px}
 .pj-per{display:flex;align-items:center;gap:4px}
 .leg i.u-late{box-shadow:inset 0 0 0 1.5px #f87171}.leg i.u-hoje{box-shadow:inset 0 0 0 1.5px var(--coral)}.leg i.u-semana{box-shadow:inset 0 0 0 1.5px #eab308}.leg i.u-prox{box-shadow:inset 0 0 0 1.5px #cbd5e1}.leg i.u-longe{box-shadow:inset 0 0 0 1.5px #e2e8f0}
 .leg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);flex-wrap:wrap}.leg i{width:14px;height:14px;border-radius:5px;display:inline-block;margin-left:8px;box-shadow:inset 0 0 0 1px var(--line)}
-.pj-ciclo{display:flex;flex-direction:column;gap:6px}.pj-ciclo+.pj-ciclo{border-top:1px dashed var(--line);padding-top:8px;margin-top:2px}
+.pj-ciclo{display:flex;flex-direction:column;gap:6px}.pj-ciclo+.pj-ciclo{border-top:1px dashed var(--line)}
 .pj-per{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-top:2px}.pj-per b{color:var(--ink)}
 .pj-reu{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--coral-soft);border-radius:12px;padding:7px 10px}
 .pj-reu small{width:100%;font-size:11px;color:var(--muted)}.pj-reu b{font-size:14px}.pj-reu .btn{margin-left:auto}
@@ -1523,7 +1528,7 @@ function cartaoCiclo(p, ciclo) {
   else if (feitoFora) st = `<div class="pj-reu ok" data-agendar="${p.id}|${pk}"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}</small><b>Agendada por fora</b></div>`;
   else { const cedo = ciclo === 'mensal' && hs < d20, u = urgencia(ag ? ag.data : (d20 || hs)); st = `<div class="pj-reu u-${u}"><small>${ciclo === 'semanal' ? 'Reunião da semana' : 'Reunião de medição'}${u === 'late' ? ' · atrasado' : u === 'hoje' ? ' · hoje' : ''}</small><b>${cedo ? 'Agendar a partir de ' + fmtData(d20) : 'A agendar'}</b><button class="btn sm ${u === 'late' || u === 'hoje' ? 'pri' : ''}" data-agendar="${p.id}|${pk}">Agendar</button></div>`; }
   const etHtml = ciclo === 'mensal' ? (ets.length
-      ? ets.sort((a, b) => a.data.localeCompare(b.data)).map(x => `<label class="pj-et ${x.feito ? 'done' : 'u-' + (x.semData ? 'longe' : urgencia(x.data))}"><input type="checkbox" data-ctl="${p.id}|${x.pkey}|${x.tkey}" ${x.feito ? 'checked' : ''}><span>${esc(x.titulo)}</span><em>${x.semData ? 'aguarda a reunião' : fmtData(x.data)}</em></label>`).join('')
+      ? ets.sort((a, b) => a.data.localeCompare(b.data)).map(x => `<label class="pj-et ${x.feito ? 'done' : (u => u === 'late' || u === 'hoje' ? 'u-' + u : 'u-neutro')(x.semData ? '' : urgencia(x.data))}"><input type="checkbox" data-ctl="${p.id}|${x.pkey}|${x.tkey}" ${x.feito ? 'checked' : ''}><span>${esc(x.titulo)}</span><em>${x.semData ? 'aguarda a reunião' : fmtData(x.data)}</em></label>`).join('')
       : etapas('mensal').map(e => `<div class="pj-et prev"><input type="checkbox" disabled><span>${esc(e.nome)}</span><em>${rotuloDias(+e.dias || 0)}</em></div>`).join('')) : '';
   return `<div class="pj-ciclo"><div class="pj-per"><b>${ciclo === 'semanal' ? 'Semanal' : 'Mensal'}</b> · ${esc(rot)}</div>${st}${etHtml}</div>`;
 }
@@ -1539,11 +1544,11 @@ function cartaoObra(p) {
   const pHtml = `<div class="pj-ciclo"><div class="pj-per"><b>Pontuais</b>${pont.length ? ' · ' + pont.length : ''}<button class="lnk pj-add" data-pontual="${p.id}" title="Nova pendência pontual">+</button></div>
     ${pont.length ? pont.slice(0, MAX).map(i => `<div class="pj-et pj-pt u-${urgencia(i.data)}"><input type="checkbox" data-conc="${i.id}|${i.data}"><span data-item="${i.id}">${esc(i.titulo)}${String(i.projetoId).startsWith('c:') ? ` <small class="hint">(${esc(i.projetoId.slice(2))})</small>` : ''}</span><em>${fmtData(i.data)}</em></div>`).join('') + (pont.length > MAX ? `<div class="hint" style="padding:2px 4px">+ ${pont.length - MAX} pendência(s)</div>` : '') : '<div class="hint" style="padding:2px 4px">Nenhuma pendência.</div>'}</div>`;
   return `<section class="pjcol" style="--c:${cor}"><header><i style="background:${tg.cor}"></i><div><b>${esc(pt.obra)}</b><small>${esc(pt.construtora || (cat ? cat.nome : (area(p.areaId) || {}).nome || ''))}</small></div></header>
-    ${temCiclo && cat.semanal ? bloco('semanal') : ''}${temCiclo && cat.dia20 ? bloco('mensal') : ''}${pHtml}</section>`;
+    ${temCiclo && cat.semanal ? bloco('semanal') : '<div class="pj-ciclo pj-vazio"><div class="pj-per"><b>Semanal</b> · não tem</div></div>'}${temCiclo && cat.dia20 ? bloco('mensal') : '<div class="pj-ciclo pj-vazio"><div class="pj-per"><b>Mensal</b> · não tem</div></div>'}${pHtml}</section>`;
 }
 function vTarefasProjetos() {
   const chave = p => { const pt = partesProjeto(p); return [normTxt(pt.construtora || pt.obra), normTxt(pt.obra)]; };
-  const ps = D.projetos.filter(p => p.categoria !== 'pessoal' && ((CATEGORIAS[p.categoria] && (CATEGORIAS[p.categoria].semanal || CATEGORIAS[p.categoria].dia20)) || pontuaisDe(p).length))
+  const ps = D.projetos.filter(p => p.categoria !== 'pessoal' && !['jf', 'sigo', 'pessoal'].includes(chaveEmpresa(p.areaId)) && ((CATEGORIAS[p.categoria] && (CATEGORIAS[p.categoria].semanal || CATEGORIAS[p.categoria].dia20)) || pontuaisDe(p).length))
     .sort((a, b) => { const x = chave(a), y = chave(b); return x[0].localeCompare(y[0], 'pt-BR') || x[1].localeCompare(y[1], 'pt-BR'); });
   return `<div class="cal-head">${abasTarefas()}<span class="lbl">Entregas por projeto</span><span style="flex:1"></span><span class="leg"><i class="u-late"></i>atrasado<i class="u-hoje"></i>hoje<i class="u-semana"></i>esta semana<i class="u-longe"></i>depois</span></div>
     ${ps.length ? `<div class="pjgrid">${ps.map(cartaoObra).join('')}</div>` : '<div class="empty">Nenhuma obra com ciclo semanal ou mensal. Defina a categoria em Configurações → Empresas e projetos.</div>'}`;
