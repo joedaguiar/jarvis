@@ -490,7 +490,21 @@ function novoItemBase(o) {
   }, o);
 }
 const area = id => D.areas.find(a => a.id === id);
-const projeto = id => D.projetos.find(p => p.id === id);
+// construtora como vínculo: id "c:<Nome>" vira um projeto virtual (sem obra específica)
+let _virt = {};
+function construtoras() {
+  const m = new Map();
+  D.projetos.forEach(p => { const c = partesProjeto(p).construtora; if (!c || p.categoria === 'pessoal') return; if (!m.has(c)) m.set(c, { nome: c, areaId: p.areaId, obras: [] }); m.get(c).obras.push(p); });
+  return [...m.values()].sort((a, b) => a.nome.localeCompare(b.nome));
+}
+function projetoConstrutora(id) {
+  const nome = id.slice(2), c = construtoras().find(c => c.nome === nome);
+  const v = _virt[id] || (_virt[id] = { id, virtual: true, construtora: nome });
+  return Object.assign(v, { nome, areaId: c ? c.areaId : (v.areaId || ''), categoria: '', tag: nome, corTag: corConstrutora(nome) || '', obras: c ? c.obras : [] });
+}
+const projeto = id => !id ? undefined : String(id).startsWith('c:') ? projetoConstrutora(id) : D.projetos.find(p => p.id === id);
+// projetos de um vínculo (construtora → suas obras)
+const obrasDoVinculo = id => { const p = projeto(id); return !p ? [] : p.virtual ? p.obras : [p]; };
 function calObj(id) { const l = todosCals(); if (id === '@principal') id = ''; return id ? l.find(c => c.id === id) : l.find(c => c.padrao); }
 function corDoCal(id) { const l = todosCals(), c = calObj(id); return c ? corCal(c, l.indexOf(c)) : ''; }
 const corItem = it => (it.demanda && projeto(it.projetoId) ? corDemanda(projeto(it.projetoId)) : '') || corDoCal(calendarioDoItem(it)) || (area(it.areaId) || {}).cor || '#64748b';
@@ -939,6 +953,7 @@ function recorrenciaGraph(it, inicio) {
 function tituloAgenda(it) {
   const p = projeto(it.projetoId);
   if (!p || p.categoria === 'pessoal') return it.titulo;
+  if (p.virtual) return p.nome + ' - ' + it.titulo;
   const pt = partesProjeto(p), obra = (p.tag || pt.obra);
   let serv = it.titulo;
   if (normTxt(serv).includes(normTxt(obra))) serv = tituloLimpo(serv, p) || serv;
@@ -1450,7 +1465,7 @@ function vTarefas() {
   const q = tFiltro.q.trim().toLowerCase();
   cards.sort((a, b) => (a.data || '9').localeCompare(b.data || '9') || ((a.k === 'item' && a.it.hora) || '').localeCompare((b.k === 'item' && b.it.hora) || ''));
   const ehExec = c => c.k === 'ctl' || (c.it.projetoId && projeto(c.it.projetoId) && (projeto(c.it.projetoId).categoria !== 'pessoal' || !c.it.recorrencia));
-  const vis = cards.filter(c => (c.k === 'ctl' || c.it.demanda) && (!tFiltro.proj || pid(c) === tFiltro.proj) && (!tFiltro.cat || cat(c) === tFiltro.cat) && (!q || c.titulo.toLowerCase().includes(q)));
+  const vis = cards.filter(c => (c.k === 'ctl' || c.it.demanda) && (!tFiltro.proj || pid(c) === tFiltro.proj || (String(tFiltro.proj).startsWith('c:') && obrasDoVinculo(tFiltro.proj).some(o => o.id === pid(c)))) && (!tFiltro.cat || cat(c) === tFiltro.cat) && (!q || c.titulo.toLowerCase().includes(q)));
   const card = c => {
     const p = projeto(pid(c)), cor = p ? corEmpresa(p) : c.k === 'ctl' ? corCtl(c.p) : corItem(c.it);
     const chk = c.k === 'ctl' ? `data-ctl="${c.p.id}|${c.pkey}|${c.tkey}"` : `data-conc="${c.it.id}|${c.chave}"`;
@@ -1789,7 +1804,7 @@ function fecharModal() { $('#modalBg').classList.remove('on'); }
 function modalItem(it, novo) {
   const r = it.recorrencia || {};
   const repetir = it.recorrencia ? r.freq : 'nao';
-  const optsProj = `<option value="">— sem projeto —</option>` + D.areas.map(a => { const ps = D.projetos.filter(p => p.areaId === a.id); return ps.length ? `<optgroup label="${esc(a.nome)}">${ps.map(p => `<option value="${p.id}" ${p.id === it.projetoId ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</optgroup>` : ''; }).join('');
+  const optsProj = `<option value="">— sem projeto —</option>` + optsProjetos(it.projetoId);
   const calAtual = calendarioDoItem(it);
   const editaveis = todosCals().filter(k => k.podeEditar || k.id === calAtual);
   const optsCal = (todosCals().some(k => k.padrao) ? '' : `<option value="@principal" ${!calAtual ? 'selected' : ''}>Outlook · Calendário principal</option>`) +
@@ -2069,7 +2084,7 @@ document.addEventListener('click', async ev => {
     case 'concluirDemanda': return salvarDemanda({ concluir: true });
     case 'reabrirDemanda': return salvarDemanda({ concluir: false });
     case 'evParaDemanda': { const e = modalEvento._e, r = projetoDoTexto(e.subject); return modalDemanda(null, r ? r.p.id : '', { titulo: r ? (tituloLimpo(e.subject, r.p) || e.subject) : e.subject, data: e.start.dateTime.slice(0, 10), origem: { e } }); }
-    case 'itemParaDemanda': { const it = D.itens.find(i => i.id === modalItem._id); if (!it) return; const p = projeto(it.projetoId), r = p ? { p } : projetoDoTexto(it.titulo); return modalDemanda(null, r ? r.p.id : '', { titulo: r ? (tituloLimpo(it.titulo, r.p) || it.titulo) : it.titulo, data: it.data, origem: { item: it } }); }
+    case 'itemParaDemanda': { const it = D.itens.find(i => i.id === modalItem._id); if (!it) return; const p = projeto(it.projetoId), r = p ? { p } : null; return modalDemanda(null, r ? r.p.id : '', { titulo: r ? (tituloLimpo(it.titulo, r.p) || it.titulo) : it.titulo, data: it.data, origem: { item: it } }); }
     case 'excluirDemanda': return excluirDemanda();
     case 'demandaParaAgenda': {
       const d = modalDemanda._it; if (!d) return;
@@ -2556,7 +2571,9 @@ function evDoRodrigo(e) { return !!(e && e._cal && chaveFiltro(e._cal.id) === ch
 function projetoDaEntrada(x) {
   if (x.k === 'item') {
     if (x.ev && evDoRodrigo(x.ev) && x.it.vinculado) return null;
-    const p = projeto(x.it.projetoId); if (p && p.categoria !== 'pessoal') return p;
+    const p = projeto(x.it.projetoId); if (p && p.categoria !== 'pessoal' && !p.virtual) return p;
+    if (p && p.virtual) return p;
+    if (!x.it.vinculado) return null; // itens do sistema: só o projeto escolhido, nunca pelo nome
     if (x.ev && evDoRodrigo(x.ev)) return null;
     const r = projetoDoTexto((x.ev && x.ev.subject) || x.titulo); return r ? r.p : null;
   }
@@ -2565,6 +2582,7 @@ function projetoDaEntrada(x) {
 }
 function partesEntrada(x) {
   const p = projetoDaEntrada(x); if (!p) return null;
+  if (p.virtual) { const cor = p.corTag || corEmpresa(p); return { p, obra: p.nome, cor, faixa: clarear(cor, .35), titulo: x.titulo }; }
   const t = x.k === 'ev' || (x.it && x.it.vinculado) ? tituloLimpo(x.titulo, p) : (tituloLimpo(x.titulo.replace(' — ' + p.nome, ''), p) || x.titulo);
   const tg = tagProjeto(p);
   return { p, obra: tg.nome, cor: tg.cor, faixa: clarear(tg.cor, .35), titulo: t || x.titulo };
@@ -2578,7 +2596,9 @@ function tituloHtml(x) {
 
 /* ================= demandas rápidas ================= */
 function optsProjetos(sel) {
-  return D.areas.map(a => { const ps = D.projetos.filter(p => p.areaId === a.id); return ps.length ? `<optgroup label="${esc(a.nome)}">${ps.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</optgroup>` : ''; }).join('');
+  const cs = construtoras().filter(c => c.obras.length > 1 || D.itens.some(i => i.projetoId === 'c:' + c.nome));
+  return D.areas.map(a => { const ps = D.projetos.filter(p => p.areaId === a.id), ca = cs.filter(c => c.areaId === a.id);
+    return (ca.length ? `<optgroup label="${esc(a.nome)} · construtoras (sem obra específica)">${ca.map(c => `<option value="c:${esc(c.nome)}" ${'c:' + c.nome === sel ? 'selected' : ''}>${esc(c.nome)} — todas as obras (${c.obras.length})</option>`).join('')}</optgroup>` : '') + (ps.length ? `<optgroup label="${esc(a.nome)}">${ps.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</optgroup>` : ''); }).join('');
 }
 function calPadraoProjeto(pid) {
   const p = projeto(pid), a = p && area(p.areaId);
