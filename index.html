@@ -1885,7 +1885,7 @@ function modalItem(it, novo) {
   const optsCal = (todosCals().some(k => k.padrao) ? '' : `<option value="@principal" ${!calAtual ? 'selected' : ''}>Outlook · Calendário principal</option>`) +
     editaveis.map(k => `<option value="${k.padrao ? '@principal' : esc(k.id)}" ${(k.padrao ? !calAtual : calAtual === k.id) ? 'selected' : ''}>${k.fonte === 'google' ? 'Google' : 'Outlook'} · ${esc(k.nome)}${k.podeEditar ? '' : ' (só leitura)'}</option>`).join('');
   const dsel = r.dias || [];
-  abrirModal(`<h3>${it.origemDemanda ? 'Levar demanda para a agenda' : novo ? 'Novo agendamento' : 'Editar agendamento'}${it.controle ? ` <span class="tag">${it.controle.split('|')[1].startsWith('S:') ? 'reunião semanal' : 'reunião mensal · ' + nomeMes(it.controle.split('|')[1].slice(2))}</span>` : ''}</h3>${it.origemDemanda ? '<p class="hint" style="margin-top:-6px">Ao salvar, a demanda sai da lista de demandas e vira este agendamento.</p>' : ''}
+  abrirModal(`<h3>${it.origemDemanda ? 'Levar demanda para a agenda' : novo ? 'Novo agendamento' : 'Editar agendamento'}${it.controle ? ` <span class="tag">${it.controle.split('|')[1].startsWith('S:') ? 'reunião semanal' : 'reunião mensal · ' + nomeMes(it.controle.split('|')[1].slice(2))}${(it.controlesExtras || []).length ? ' · ' + (1 + new Set(it.controlesExtras.map(k => k.split('|')[0]).filter(x => x !== it.controle.split('|')[0])).size) + ' obras' : ''}</span>` : ''}</h3>${it.origemDemanda ? '<p class="hint" style="margin-top:-6px">Ao salvar, a demanda sai da lista de demandas e vira este agendamento.</p>' : ''}
   <div class="fr"><div class="f" style="flex:2"><label>Título</label><input id="iTit" value="${esc(it.titulo)}" placeholder="Ex.: Relatório semanal de avanço"></div>
     <div class="f"><label>Tipo</label><select id="iTipo">${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}" ${k === it.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
   <div class="fr"><div class="f"><label>Agenda</label><div style="display:flex;gap:6px;align-items:center"><span class="sw" id="iCalSw" style="width:14px;height:14px;background:${corItem(it)}"></span><select id="iCal" style="flex:1">${optsCal}</select></div></div><div class="f"><label>Projeto / obra</label><select id="iProj">${optsProj}</select></div></div>
@@ -1944,7 +1944,8 @@ function modalItem(it, novo) {
   }));
   $('#iRep').addEventListener('change', () => { if ($('#iRep').value === 'semanal' && !$$('.iDow:checked').length && $('#iData').value) { const d = parseYmd($('#iData').value).getDay(); $$('.iDow').forEach(c => c.checked = +c.value === d); } upd(); });
   const ciclo = () => {
-    const pid = $('#iProj').value, p = projeto(pid), cat = p && CATEGORIAS[p.categoria], d = $('#iData').value, box = $('#iCicloBox');
+    let pid = $('#iProj').value; if (String(pid).startsWith('c:') && it.controle) pid = it.controle.split('|')[0];
+    const p = projeto(pid), cat = p && CATEGORIAS[p.categoria], d = $('#iData').value, box = $('#iCicloBox');
     const atual = it.controle && it.controle.split('|')[0] === pid ? it.controle.split('|')[1] : '';
     if (!cat || !(cat.semanal || cat.dia20) || $('#iTipo').value !== 'reuniao') { box.style.display = 'none'; $('#iCiclo').innerHTML = '<option value=""></option>'; return; }
     box.style.display = '';
@@ -1996,9 +1997,10 @@ async function salvarItemModal() {
   if (it.sincronizar) it._pend = true;
   it.areaId = areaDoItem(it);
   { // vínculo da reunião com o ciclo da obra (semanal / mensal)
-    const novoCiclo = it.tipo === 'reuniao' && $('#iCiclo') && $('#iCiclo').value ? it.projetoId + '|' + $('#iCiclo').value : '';
-    if (it.controle && it.controle !== novoCiclo) { const [a, b] = it.controle.split('|'), r = ctlPeek(a, b); if (r.reuniaoItem === it.id) delete r.reuniaoItem; delete it.controle; }
-    if (novoCiclo) { const [a, b] = novoCiclo.split('|'), r = ctlRec(a, b); r.reuniaoItem = it.id; delete r.reuniaoData; it.controle = novoCiclo; }
+    const pidC = String(it.projetoId).startsWith('c:') && it.controle ? it.controle.split('|')[0] : it.projetoId;
+    const novoCiclo = it.tipo === 'reuniao' && $('#iCiclo') && $('#iCiclo').value ? pidC + '|' + $('#iCiclo').value : '';
+    if (it.controle && it.controle !== novoCiclo) desligarReuniao(it);
+    if (novoCiclo && it.controle !== novoCiclo) ligarReuniao(it, [novoCiclo]);
   }
   D.config.ultimoCal = it.calendarioId;
   if (novo) D.itens.push(it);
@@ -2038,8 +2040,9 @@ function modalEvento(e) {
       : (edit ? `<p><button class="btn sm" data-acao="addReuniaoOnline">+ Adicionar link ${c.fonte === 'google' ? 'do Google Meet' : 'do Teams'}</button></p>` : '')}
     <p>${e.webLink ? `<a href="${esc(e.webLink)}" target="_blank">Abrir no ${c.fonte === 'google' ? 'Google Agenda' : 'Outlook'}</a>` : ''}</p>
     <div class="box"><label class="hint" style="font-weight:600">Vincular a um projeto</label>
-      <div style="display:flex;gap:8px;margin-top:6px"><select id="eProj" style="flex:1;border:1px solid #cfd4de;border-radius:8px;padding:6px">${optsProjetos((!evDoRodrigo(e) && projetoDoTexto(e.subject) || {}).p ? projetoDoTexto(e.subject).p.id : '')}</select>
+      <div style="display:flex;gap:8px;margin-top:6px"><select id="eProj" style="flex:1;border:1px solid #cfd4de;border-radius:8px;padding:6px"><option value="">— escolha —</option>${optsProjetos('')}</select>
       <button class="btn" data-acao="vincularEv" ${D.projetos.length ? '' : 'disabled'}>Vincular</button></div>
+      <div id="eCicloBox" style="display:none;margin-top:8px"><label class="hint" style="font-weight:600">É a reunião do ciclo</label><select id="eCiclo" style="width:100%;margin-top:4px"></select></div>
       <div class="hint" style="margin-top:4px">${e.seriesMasterId ? 'Vincula a série inteira. ' : ''}O evento continua na agenda; o projeto passa a acompanhá-lo.</div></div>
     <div class="acts">${edit ? `<button class="btn dan l" data-acao="excluirEv">Excluir</button><button class="btn" data-acao="evParaDemanda" title="Tira da agenda e cria uma demanda do projeto">Transformar em demanda</button>` : ''}<button class="btn" data-acao="fechar">Fechar</button>${edit ? `<button class="btn pri" data-acao="salvarEv">Salvar</button>` : ''}</div>`);
   modalEvento._e = e;
@@ -2304,6 +2307,20 @@ function recDeGoogle(lst, inicio) {
   else throw new Error('repetição anual ainda não é suportada');
   return r;
 }
+function opcoesCiclo(p, data) {
+  const cat = p && CATEGORIAS[p.categoria]; if (!cat || !(cat.semanal || cat.dia20)) return [];
+  const dd = data ? parseYmd(data) : hoje0(), op = [];
+  if (cat.semanal) op.push(['S:' + ymd(segundaDe(dd)), 'Reunião semanal · semana de ' + fmtData(ymd(segundaDe(dd)))]);
+  if (cat.dia20) { const m = dd.getDate() >= 15 ? new Date(dd.getFullYear(), dd.getMonth(), 1) : new Date(dd.getFullYear(), dd.getMonth() - 1, 1);
+    [m, new Date(m.getFullYear(), m.getMonth() + 1, 1)].forEach(x => { const ym = `${x.getFullYear()}-${pad(x.getMonth() + 1)}`; op.push(['M:' + ym, 'Reunião mensal · medição de ' + nomeMes(ym)]); }); }
+  return op;
+}
+document.addEventListener('change', ev => {
+  if (ev.target.id !== 'eProj' || !modalEvento._e) return;
+  const p = projeto(ev.target.value), op = p && !p.virtual ? opcoesCiclo(p, modalEvento._e.start.dateTime.slice(0, 10)) : [];
+  $('#eCicloBox').style.display = op.length ? '' : 'none';
+  $('#eCiclo').innerHTML = '<option value="">— nenhum (reunião avulsa) —</option>' + op.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
+});
 async function vincularEvento() {
   const e = modalEvento._e, c = e._cal, pid = $('#eProj').value, p = projeto(pid);
   if (!p) return toast('Escolha um projeto.', true);
@@ -2327,8 +2344,10 @@ async function vincularEvento() {
       calendarioId: c.padrao ? '@principal' : c.id, outlook: { eventId: base.id, calendarId: c.padrao ? '' : c.id },
       sincronizar: c.podeEditar, leitura: !c.podeEditar, vinculado: true, recImport: JSON.stringify(base.rec), showAs: e.showAs || 'busy', showAsImport: e.showAs || 'busy'
     });
+    const cic = $('#eCiclo') && $('#eCiclo').value;
+    if (cic) { it.tipo = 'reuniao'; ligarReuniao(it, [p.id + '|' + cic]); }
     D.itens.push(it); salvar(); fecharModal(); faixaEventos = ''; render();
-    toast(`Vinculado a ${p.nome}.`);
+    toast(`Vinculado a ${p.nome}${cic ? ' como ' + (cic.startsWith('S:') ? 'reunião semanal' : 'reunião mensal') : ''}.`);
   } catch (er) { toast('Não consegui vincular: ' + er.message, true); }
 }
 
@@ -2420,6 +2439,7 @@ function dataReuniao(pid, pkey) {
 // gera as tarefas de controle de um projeto com vencimento entre ini e fim
 // a reunião mensal agendada dentro da semana vale como a reunião semanal daquela semana
 function mensalNaSemana(p, seg) {
+  return null; // não deduz mais: o vínculo é sempre explícito
   const a = ymd(seg), b = ymd(addDays(seg, 6));
   for (let k = -1; k <= 1; k++) { const m = new Date(seg.getFullYear(), seg.getMonth() + k, 1), r = dataReuniao(p.id, `M:${m.getFullYear()}-${pad(m.getMonth() + 1)}`); if (r && r.data >= a && r.data <= b) return r; }
   return null;
@@ -2495,7 +2515,12 @@ function modalAgendar(pid, pkey) {
     <div class="f"><label>Agenda</label><select id="aCal">${optsCal}</select></div>
     <div class="f"><label>Participantes</label>${campoParticipantes('aPart', p.participantes || '')}</div>
     <label class="cb"><input type="checkbox" id="aLink" ${p.linkOnline !== false ? 'checked' : ''}> Criar link de reunião online (Meet / Teams)</label>
-    ${sem && !reu && mensalNaSemana(p, parseYmd(pkey.slice(2))) ? `<p class="hint" style="background:#e9f6ee;color:#14532d;padding:7px 10px;border-radius:10px">A reunião mensal desta obra já está nesta semana (${fmtData(mensalNaSemana(p, parseYmd(pkey.slice(2))).data)}) e vale como a semanal. Só agende se quiser uma reunião semanal separada.</p>` : ''}
+    ${(() => { const ir = obrasIrmas(p, sem), cons = partesProjeto(p).construtora; if (!ir.length) return '';
+      const pref = (D.config.reuniaoConjunta || {})[cons] !== false, ja = reu && reu.it ? (reu.it.controlesExtras || []) : null;
+      return `<div class="box"><b style="font-size:12.5px">Mesma reunião para as outras obras da ${esc(cons)}</b>${ir.map(q => { const k = q.id + '|' + pkey, rq = dataReuniao(q.id, pkey), marcado = ja ? ja.includes(k) : pref && !rq;
+        return `<label class="cb" style="margin:4px 0 0"><input type="checkbox" class="aIrma" value="${q.id}" ${marcado ? 'checked' : ''}> ${esc(partesProjeto(q).obra)}${rq && !(reu && reu.it && rq.it && rq.it.id === reu.it.id) ? ` <span class="hint">(já tem reunião em ${fmtData(rq.data)})</span>` : ''}</label>`; }).join('')}
+        <span class="hint">Marcadas: uma reunião só na agenda, e cada obra tem o seu ciclo e os seus relatórios.</span></div>`; })()}
+    ${!sem && CATEGORIAS[p.categoria].semanal ? `<label class="cb"><input type="checkbox" id="aValeSem" ${reu && reu.it && (reu.it.controlesExtras || []).some(k => k.split('|')[1].startsWith('S:')) ? 'checked' : ''}> Esta reunião também vale como a reunião semanal da semana dela</label>` : ''}
     <div class="box aEnt"><b>${sem ? 'Reunião semanal' : 'Reunião mensal (medição)'}: o que vem junto</b><div id="aEntregas"></div></div>
     <p class="hint" id="aAviso"></p>
     <div class="acts">${reu || ctlPeek(pid, pkey).feitos.agendar ? `<button class="btn dan l" data-agendar-desfazer="${pid}|${pkey}" title="Volta para 'a agendar'${reu && reu.it ? ' e apaga a reunião da agenda' : ''}">Desfazer agendamento</button>` : `<button class="btn l" data-agendar-fora="${pid}|${pkey}" title="Só registra a data; não cria evento">Já agendei por fora</button>`}<button class="btn" data-acao="fechar">Cancelar</button><button class="btn pri" data-agendar-criar="${pid}|${pkey}">Criar reunião na agenda</button></div>`);
@@ -2509,24 +2534,41 @@ async function agendarCriar(pid, pkey) {
   const r = ctlRec(pid, pkey);
   Object.assign(p, { agendaId: $('#aCal').value, participantes: $('#aPart').value.trim(), horaReuniao: $('#aHora').value, duracaoReuniao: +$('#aDur').value || 60, linkOnline: $('#aLink').checked });
   let it = r.reuniaoItem ? D.itens.find(i => i.id === r.reuniaoItem) : null;
-  if (!it) { it = novoItemBase({ tipo: 'reuniao', controle: pid + '|' + pkey }); D.itens.push(it); r.reuniaoItem = it.id; }
-  Object.assign(it, { titulo: $('#aTit').value.trim() || 'Reunião', projetoId: pid, areaId: p.areaId, data: d, hora: $('#aHora').value, duracao: +$('#aDur').value || 60, calendarioId: $('#aCal').value, participantes: p.participantes, teams: p.linkOnline, sincronizar: true, _pend: true });
+  if (!it) { it = novoItemBase({ tipo: 'reuniao' }); D.itens.push(it); }
+  const irmas = $$('.aIrma:checked').map(x => x.value), cons = partesProjeto(p).construtora;
+  if ($$('.aIrma').length) D.config.reuniaoConjunta = Object.assign({}, D.config.reuniaoConjunta, { [cons]: irmas.length > 0 });
+  const lista = [pid + '|' + pkey].concat(irmas.map(q => q + '|' + pkey));
+  if ($('#aValeSem') && $('#aValeSem').checked) [pid].concat(irmas).forEach(q => { const qp = projeto(q); if (qp && CATEGORIAS[qp.categoria].semanal) lista.push(q + '|S:' + ymd(segundaDe(parseYmd(d)))); });
+  desligarReuniao(it); ligarReuniao(it, lista);
+  Object.assign(it, { titulo: $('#aTit').value.trim() || 'Reunião', projetoId: irmas.length && cons ? 'c:' + cons : pid, areaId: p.areaId, data: d, hora: $('#aHora').value, duracao: +$('#aDur').value || 60, calendarioId: $('#aCal').value, participantes: p.participantes, teams: p.linkOnline, sincronizar: true, _pend: true });
   delete r.reuniaoData;
   fecharModal(); salvar(); render();
   await sincronizar(it); salvar(); faixaEventos = ''; render();
   if (!it.erroSync) toast('Reunião criada na agenda' + (it.linkReuniao ? ' com link.' : '.'));
+}
+function obrasIrmas(p, sem) {
+  const cons = partesProjeto(p).construtora; if (!cons) return [];
+  return D.projetos.filter(q => q.id !== p.id && partesProjeto(q).construtora === cons && CATEGORIAS[q.categoria] && (sem ? CATEGORIAS[q.categoria].semanal : CATEGORIAS[q.categoria].dia20));
+}
+function desligarReuniao(it) { // tira esta reunião de todos os ciclos a que estava ligada
+  Object.entries(D.controle || {}).forEach(([pid, m]) => Object.values(m).forEach(r => { if (r.reuniaoItem === it.id) delete r.reuniaoItem; }));
+  delete it.controle; delete it.controlesExtras;
+}
+function ligarReuniao(it, lista) { // lista: ["pid|pkey", ...]; a primeira é a principal
+  lista.forEach(k => { const [a, b] = k.split('|'), r = ctlRec(a, b); r.reuniaoItem = it.id; delete r.reuniaoData; delete r.reuniaoHora; });
+  it.controle = lista[0]; it.controlesExtras = lista.slice(1);
 }
 async function agendarDesfazer(pid, pkey) {
   const r = ctlRec(pid, pkey), it = r.reuniaoItem ? D.itens.find(i => i.id === r.reuniaoItem) : null;
   if (!confirm(it ? 'Desfazer o agendamento? A reunião criada pelo sistema também será apagada da agenda.' : 'Desfazer o agendamento?')) return;
   delete r.reuniaoItem; delete r.reuniaoData; delete r.reuniaoHora; delete r.feitos.agendar;
   fecharModal();
-  if (it) { delete it.controle; if (it.outlook && !it.vinculado) { it.sincronizar = false; await sincronizar(it).catch(() => { }); } D.itens = D.itens.filter(i => i !== it); faixaEventos = ''; }
+  if (it) { desligarReuniao(it); if (it.outlook && !it.vinculado) { it.sincronizar = false; await sincronizar(it).catch(() => { }); } D.itens = D.itens.filter(i => i !== it); faixaEventos = ''; }
   salvar(); render(); toast('Agendamento desfeito.');
 }
 function agendarFora(pid, pkey) {
   const d = $('#aData').value; if (!d) return toast('Escolha a data.', true);
-  const r = ctlRec(pid, pkey); r.reuniaoData = d; r.reuniaoHora = $('#aHora').value; r.feitos.agendar = true;
+  [pid].concat($$('.aIrma:checked').map(x => x.value)).forEach(q => { const r = ctlRec(q, pkey); r.reuniaoData = d; r.reuniaoHora = $('#aHora').value; r.feitos.agendar = true; });
   fecharModal(); salvar(); render(); toast('Data da reunião registrada.');
 }
 // arrastar cartões entre dias (aba Tarefas)
