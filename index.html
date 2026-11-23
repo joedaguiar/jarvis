@@ -2596,9 +2596,9 @@ function tituloHtml(x) {
 
 /* ================= demandas rápidas ================= */
 function optsProjetos(sel) {
-  const cs = construtoras().filter(c => c.obras.length > 1 || D.itens.some(i => i.projetoId === 'c:' + c.nome));
-  return D.areas.map(a => { const ps = D.projetos.filter(p => p.areaId === a.id), ca = cs.filter(c => c.areaId === a.id);
-    return (ca.length ? `<optgroup label="${esc(a.nome)} · construtoras (sem obra específica)">${ca.map(c => `<option value="c:${esc(c.nome)}" ${'c:' + c.nome === sel ? 'selected' : ''}>${esc(c.nome)} — todas as obras (${c.obras.length})</option>`).join('')}</optgroup>` : '') + (ps.length ? `<optgroup label="${esc(a.nome)}">${ps.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</optgroup>` : ''); }).join('');
+  const cs = construtoras();
+  return (cs.length ? `<optgroup label="Construtoras">${cs.map(c => `<option value="c:${esc(c.nome)}" ${'c:' + c.nome === sel ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</optgroup>` : '')
+    + D.areas.map(a => { const ps = D.projetos.filter(p => p.areaId === a.id); return ps.length ? `<optgroup label="${esc(a.nome)}">${ps.map(p => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</optgroup>` : ''; }).join('');
 }
 function calPadraoProjeto(pid) {
   const p = projeto(pid), a = p && area(p.areaId);
