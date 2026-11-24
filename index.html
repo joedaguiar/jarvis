@@ -2532,7 +2532,9 @@ function controleEntre(ini, fim) {
 // pendências até hoje (atrasadas + de hoje + alertas do dia 20 ativos)
 function pendenciasControle() {
   const h = hoje0();
-  return D.projetos.filter(p => CATEGORIAS[p.categoria]).flatMap(p => tarefasControle(p, addDays(h, -75), h)).filter(x => !x.feito);
+  // semanal só vale dentro da própria semana (semana passada não vira atraso); mensal fica pendente até ser feito
+  const seg = ymd(segundaDe(h));
+  return D.projetos.filter(p => CATEGORIAS[p.categoria]).flatMap(p => tarefasControle(p, addDays(h, -75), h)).filter(x => !x.feito && !(x.pkey.startsWith('S:') && x.pkey.slice(2) < seg));
 }
 function linhaCtl(x, opts = {}) {
   const hs = ymd(hoje0()), late = x.data < hs, cor = corCtl(x.p);
